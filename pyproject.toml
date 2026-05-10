@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "kapsvectordb"
+version = "0.1.0"
+description = "A fresh attempt at vector database design"
+authors = ["kapil-malik <kapil.ee06@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = "^2.4.4"
+sentence-transformers = "^5.4.1"
+pypdf = "^6.11.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.3"
+black = "^26.3.1"
+isort = "^8.0.1"
+mypy = "^2.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
