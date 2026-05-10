@@ -5,6 +5,7 @@ description = "A fresh attempt at vector database design"
 authors = ["kapil-malik <kapil.ee06@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [{include = "vectordb", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
