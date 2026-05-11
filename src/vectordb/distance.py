@@ -1,5 +1,19 @@
 import numpy as np
 
+def dot_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Dot product similarity is simply the sum of the products of corresponding elements.
+
+    Result range:
+    - Higher values indicate more similar vectors
+    - Can be negative if vectors point in opposite directions
+    """
+
+    if a.shape != b.shape:
+        raise ValueError(f"Vector shapes must match. Got {a.shape} and {b.shape}")
+
+    return float(np.dot(a, b))
+
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """

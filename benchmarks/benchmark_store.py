@@ -8,6 +8,9 @@ from tqdm import tqdm
 from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
+from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
+from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
+from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 
 
 def generate_random_vector(dim: int) -> np.ndarray:
@@ -113,6 +116,12 @@ def benchmark_search(
 def create_store(store_type: str) -> VectorStore:
     if store_type == "naive":
         return NaiveInMemVectorStore()
+    elif store_type == "normalized":
+        return NormalizedInMemVectorStore()
+    elif store_type == "matrix":
+        return MatrixBackedInMemVectorStore()
+    elif store_type == "buffered-matrix":
+        return BufferedMatrixInMemVectorStore()
 
     raise ValueError(f"Unknown store type: {store_type}")
 
@@ -122,7 +131,9 @@ def main():
         description="Benchmark vector store"
     )
 
-    parser.add_argument("--store", choices=["naive"], default="naive")
+    parser.add_argument("--store",
+                        choices=["naive", "normalized", "matrix", "buffered-matrix"],
+                        default="naive")
     parser.add_argument("--records", type=int, default=10_000)
     parser.add_argument("--dim", type=int, default=384)
     parser.add_argument("--queries", type=int, default=100)

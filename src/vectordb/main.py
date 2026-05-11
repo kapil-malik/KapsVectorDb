@@ -1,12 +1,14 @@
 import numpy as np
 
 from vectordb.models import VectorRecord
-from vectordb.store import InMemoryVectorStore
+from vectordb.store_base import VectorStore
+from vectordb.stores.naive_inmem import NaiveInMemVectorStore
+from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
+from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
+from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 
 
-def main():
-    store = InMemoryVectorStore()
-
+def simple_similarity_test(store: VectorStore) -> None:
     store.insert(
         VectorRecord(
             id="doc-1",
@@ -45,6 +47,20 @@ def main():
             f"score={result.score:.4f}, "
             f"text={result.record.text}"
         )
+
+
+def main():
+    print("Testing NaiveInMemVectorStore:")
+    simple_similarity_test(NaiveInMemVectorStore())
+
+    print("\nTesting NormalizedInMemVectorStore:")
+    simple_similarity_test(NormalizedInMemVectorStore())
+
+    print("\nTesting MatrixBackedInMemVectorStore:")
+    simple_similarity_test(MatrixBackedInMemVectorStore())
+
+    print("\nTesting BufferedMatrixInMemVectorStore:")
+    simple_similarity_test(BufferedMatrixInMemVectorStore())
 
 
 if __name__ == "__main__":
