@@ -4,20 +4,7 @@ from vectordb.distance import cosine_similarity
 from vectordb.models import SearchResult, VectorRecord
 
 
-class InMemoryVectorStore:
-    """
-    Naive in-memory vector database.
-
-    Internally:
-    - stores records in a Python dictionary
-    - search scans every vector
-    - computes similarity against each one
-    - sorts by score
-    - returns top_k
-
-    This is intentionally simple.
-    """
-
+class NaiveInMemVectorStore:
     def __init__(self):
         self._records: dict[str, VectorRecord] = {}
 
@@ -51,5 +38,4 @@ class InMemoryVectorStore:
             results.append(SearchResult(record=record, score=score))
 
         results.sort(key=lambda result: result.score, reverse=True)
-
         return results[:top_k]
