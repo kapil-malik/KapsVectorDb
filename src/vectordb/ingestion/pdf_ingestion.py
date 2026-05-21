@@ -1,30 +1,45 @@
 from pathlib import Path
 
-from vectordb.ingestion.chunker import TextChunk, chunk_text
+from vectordb.ingestion.chunker import (
+    Chunker,
+    FixedSizeCharacterChunker,
+    TextChunk,
+)
 from vectordb.ingestion.pdf_loader import load_pdf_pages
 
 
 def chunks_from_pdf(
         file_path: str | Path,
-        chunk_size_chars: int = 800,
-        overlap_chars: int = 100,
+        chunker: Chunker | None = None,
 ) -> list[TextChunk]:
     path = Path(file_path)
     pages = load_pdf_pages(path)
 
+    actual_chunker = chunker or FixedSizeCharacterChunker()
+
     all_chunks: list[TextChunk] = []
 
+    global_chunk_index = 0
+
     for page_number, page_text in pages:
-        page_chunks = chunk_text(
+        page_chunks = actual_chunker.chunk(
             text=page_text,
-            chunk_size_chars=chunk_size_chars,
-            overlap_chars=overlap_chars,
             base_metadata={
                 "source_file": path.name,
                 "page": page_number,
             },
         )
 
-        all_chunks.extend(page_chunks)
+        for chunk in page_chunks:
+            metadata = dict(chunk.metadata)
+            metadata["global_chunk_index"] = global_chunk_index
+            global_chunk_index += 1
+
+            all_chunks.append(
+                TextChunk(
+                    text=chunk.text,
+                    metadata=metadata,
+                )
+            )
 
     return all_chunks
