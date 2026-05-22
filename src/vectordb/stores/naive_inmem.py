@@ -1,6 +1,9 @@
+from typing import Any
+
 import numpy as np
 
 from vectordb.distance import cosine_similarity
+from vectordb.filters import metadata_matches
 from vectordb.models import SearchResult, VectorRecord
 
 
@@ -27,13 +30,19 @@ class NaiveInMemVectorStore:
     def count(self) -> int:
         return len(self._records)
 
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> list[SearchResult]:
+    def search(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None) -> list[SearchResult]:
         if top_k <= 0:
             raise ValueError("top_k must be positive")
 
         results: list[SearchResult] = []
 
         for record in self._records.values():
+            if not metadata_matches(record, filters):
+                continue
             score = cosine_similarity(query_vector, record.vector)
             results.append(SearchResult(record=record, score=score))
 

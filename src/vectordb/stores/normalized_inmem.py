@@ -1,6 +1,9 @@
+from typing import Any
+
 import numpy as np
 
 from vectordb.distance import dot_similarity
+from vectordb.filters import metadata_matches
 from vectordb.models import SearchResult, VectorRecord
 
 
@@ -39,7 +42,11 @@ class NormalizedInMemVectorStore:
     def count(self) -> int:
         return len(self._records)
 
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> list[SearchResult]:
+    def search(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None) -> list[SearchResult]:
         if top_k <= 0:
             raise ValueError("top_k must be positive")
 
@@ -52,6 +59,8 @@ class NormalizedInMemVectorStore:
         normalized_query = (query_vector / norm).astype(np.float32)
 
         for record in self._records.values():
+            if not metadata_matches(record, filters):
+                continue
             score = dot_similarity(normalized_query, record.vector)
             results.append(SearchResult(record=record, score=score))
 

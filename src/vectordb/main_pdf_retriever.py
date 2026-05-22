@@ -1,6 +1,7 @@
 import argparse
 
 from vectordb.embeddings.sentence_transformer import SentenceTransformerEmbeddingModel
+from vectordb.ingestion.chunker import RecursiveTextChunker
 from vectordb.ingestion.pdf_ingestion import chunks_from_pdf
 from vectordb.retrieval.semantic_text_retriever import SemanticTextRetriever
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
@@ -22,7 +23,7 @@ def main():
         embedding_model=embedding_model,
     )
 
-    chunks = chunks_from_pdf(args.pdf)
+    chunks = chunks_from_pdf(args.pdf, RecursiveTextChunker())
 
     retriever.add_chunks(
         texts=[chunk.text for chunk in chunks],

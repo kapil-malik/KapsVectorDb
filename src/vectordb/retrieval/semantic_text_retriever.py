@@ -95,12 +95,16 @@ class SemanticTextRetriever:
             self,
             query: str,
             top_k: int = 5,
+            filters: dict[str, Any] | None = None,
     ) -> list[RetrievedTextChunk]:
         if not query.strip():
             raise ValueError("query must not be empty")
 
         query_vector = self._embedding_model.embed(query)
-        results = self._vector_store.search(query_vector=query_vector, top_k=top_k)
+        results = self._vector_store.search(
+            query_vector=query_vector,
+            top_k=top_k,
+            filters=filters)
 
         return [
             RetrievedTextChunk(

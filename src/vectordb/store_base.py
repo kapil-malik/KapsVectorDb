@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 import numpy as np
 
 from vectordb.models import SearchResult, VectorRecord
@@ -17,5 +17,9 @@ class VectorStore(Protocol):
     def count(self) -> int:
         ...
 
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> list[SearchResult]:
+    def search(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None) -> list[SearchResult]:
         ...

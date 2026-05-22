@@ -1,9 +1,11 @@
+from typing import Any
+
 import heapq
 
 import numpy as np
 
 from vectordb.models import SearchResult, VectorRecord
-
+from vectordb.filters import metadata_matches
 
 class BufferedMatrixInMemVectorStore:
     """
@@ -104,7 +106,11 @@ class BufferedMatrixInMemVectorStore:
     def count(self) -> int:
         return len(self._records)
 
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> list[SearchResult]:
+    def search(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None) -> list[SearchResult]:
         if top_k <= 0:
             raise ValueError("top_k must be positive")
 
@@ -126,32 +132,47 @@ class BufferedMatrixInMemVectorStore:
         normalized_query = (query_vector / norm).astype(np.float32)
 
         candidates: list[tuple[float, str]] = []
+        candidate_multiplier = 10 if filters else 4
 
         # Search main matrix.
         if self._vectors is not None and len(self._ids) > 0:
             scores = self._vectors @ normalized_query
 
             # Get more than top_k to tolerate deleted/tombstoned records.
-            candidate_count = min(len(scores), top_k * 4)
+            candidate_count = min(len(scores), top_k * candidate_multiplier)
             top_indices = np.argpartition(-scores, candidate_count - 1)[:candidate_count]
 
             for index in top_indices:
                 record_id = self._ids[index]
-                if record_id in self._records:
-                    candidates.append((float(scores[index]), record_id))
+                record = self._records.get(record_id)
+
+                if record is None:
+                    continue
+
+                if not metadata_matches(record, filters):
+                    continue
+
+                candidates.append((float(scores[index]), record_id))
 
         # Search pending buffer.
         if self._buffer_vectors:
             buffer_matrix = np.vstack(self._buffer_vectors).astype(np.float32)
             buffer_scores = buffer_matrix @ normalized_query
 
-            candidate_count = min(len(buffer_scores), top_k * 4)
+            candidate_count = min(len(buffer_scores), top_k * candidate_multiplier)
             top_indices = np.argpartition(-buffer_scores, candidate_count - 1)[:candidate_count]
 
             for index in top_indices:
                 record_id = self._buffer_ids[index]
-                if record_id in self._records:
-                    candidates.append((float(buffer_scores[index]), record_id))
+                record = self._records.get(record_id)
+
+                if record is None:
+                    continue
+
+                if not metadata_matches(record, filters):
+                    continue
+
+                candidates.append((float(buffer_scores[index]), record_id))
 
         top_candidates = heapq.nlargest(top_k, candidates, key=lambda item: item[0])
 

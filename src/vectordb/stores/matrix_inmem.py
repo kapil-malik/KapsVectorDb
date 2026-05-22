@@ -1,7 +1,9 @@
+from typing import Any
+
 import numpy as np
 
 from vectordb.models import SearchResult, VectorRecord
-
+from vectordb.filters import metadata_matches
 
 class MatrixBackedInMemVectorStore:
     """
@@ -87,7 +89,11 @@ class MatrixBackedInMemVectorStore:
     def count(self) -> int:
         return len(self._records)
 
-    def search(self, query_vector: np.ndarray, top_k: int = 5) -> list[SearchResult]:
+    def search(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None) -> list[SearchResult]:
         if top_k <= 0:
             raise ValueError("top_k must be positive")
 
@@ -123,6 +129,9 @@ class MatrixBackedInMemVectorStore:
             record = self._records.get(record_id)
 
             if record is None:
+                continue
+
+            if not metadata_matches(record, filters):
                 continue
 
             active_results.append(
