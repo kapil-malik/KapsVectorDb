@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+import json
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,25 @@ class VectorRecord:
 
         if self.vector.size == 0:
             raise ValueError("Vector must not be empty")
+
+    @classmethod
+    def from_metadata_json(cls, line: str, vector: np.ndarray | None = None) -> "VectorRecord":
+        data = json.loads(line)
+        return cls(
+            id=data["id"],
+            vector=vector,
+            text=data["text"],
+            metadata=data.get("metadata", {}),
+        )
+
+    def to_metadata_json(self):
+        return json.dumps(
+            {
+                "id": self.id,
+                "text": self.text,
+                "metadata": self.metadata,
+            }
+        )
 
 
 @dataclass(frozen=True)

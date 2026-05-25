@@ -2,13 +2,13 @@ import numpy as np
 
 from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
+from vectordb.stores.buffered_matrix_file import BufferedMatrixFileVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
 from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
 from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 
-
-def simple_similarity_test(store: VectorStore) -> None:
+def insert_dummy_records(store: VectorStore) -> None:
     store.insert(
         VectorRecord(
             id="doc-1",
@@ -36,6 +36,7 @@ def simple_similarity_test(store: VectorStore) -> None:
         )
     )
 
+def search_records(store: VectorStore) -> None:
     query_vector = np.array([1.0, 0.0, 0.0])
 
     results = store.search(query_vector=query_vector, top_k=2)
@@ -48,20 +49,29 @@ def simple_similarity_test(store: VectorStore) -> None:
             f"text={result.record.text}"
         )
 
+def simple_similarity_test(store: VectorStore) -> None:
+    insert_dummy_records(store)
+    search_records(store)
+
 
 def main():
-    print("Testing NaiveInMemVectorStore:")
-    simple_similarity_test(NaiveInMemVectorStore())
+    # print("Testing NaiveInMemVectorStore:")
+    # simple_similarity_test(NaiveInMemVectorStore())
+    #
+    # print("\nTesting NormalizedInMemVectorStore:")
+    # simple_similarity_test(NormalizedInMemVectorStore())
+    #
+    # print("\nTesting MatrixBackedInMemVectorStore:")
+    # simple_similarity_test(MatrixBackedInMemVectorStore())
+    #
+    # print("\nTesting BufferedMatrixInMemVectorStore:")
+    # simple_similarity_test(BufferedMatrixInMemVectorStore())
 
-    print("\nTesting NormalizedInMemVectorStore:")
-    simple_similarity_test(NormalizedInMemVectorStore())
-
-    print("\nTesting MatrixBackedInMemVectorStore:")
-    simple_similarity_test(MatrixBackedInMemVectorStore())
-
-    print("\nTesting BufferedMatrixInMemVectorStore:")
-    simple_similarity_test(BufferedMatrixInMemVectorStore())
-
+    print("\nTesting BufferedMatrixFileVectorStore:")
+    fvs = BufferedMatrixFileVectorStore()
+    # insert_dummy_records(fvs)
+    # fvs.save()
+    search_records(fvs)
 
 if __name__ == "__main__":
     main()

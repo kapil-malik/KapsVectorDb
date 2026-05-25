@@ -1,16 +1,29 @@
 import argparse
 import time
 from statistics import mean
+import os
+import shutil
+from pathlib import Path
 
 import numpy as np
 from tqdm import tqdm
 
 from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
+from vectordb.stores.buffered_matrix_file import BufferedMatrixFileVectorStore
+from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
+from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
 from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
-from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
-from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
+
+
+def clean_file_store_data(path: str = "benchmark_file_store") -> None:
+    store_path = Path(path)
+
+    if store_path.exists():
+        shutil.rmtree(store_path)
+
+    store_path.mkdir(parents=True, exist_ok=True)
 
 
 def generate_random_vector(dim: int) -> np.ndarray:
@@ -113,6 +126,53 @@ def benchmark_search(
     print(f"queries/sec    : {queries_per_sec:.2f}")
 
 
+def benchmark_delete(
+        store: VectorStore,
+        delete_count: int,
+) -> None:
+    start = time.perf_counter()
+
+    deleted = 0
+
+    for i in tqdm(range(delete_count), desc="Deleting vectors"):
+        if store.delete(f"record-{i}"):
+            deleted += 1
+
+    end = time.perf_counter()
+
+    total_time_sec = end - start
+
+    print("\nDelete benchmark")
+    print("----------------")
+    print(f"requested deletes : {delete_count}")
+    print(f"actual deletes    : {deleted}")
+    print(f"total time        : {total_time_sec:.4f} sec")
+    print(f"deletes/sec       : {deleted / total_time_sec:.2f}" if total_time_sec > 0 else "deletes/sec       : inf")
+    print(f"remaining count   : {store.count()}")
+
+
+def benchmark_compact(store: VectorStore) -> None:
+    if not hasattr(store, "compact"):
+        print("\nCompact benchmark")
+        print("-----------------")
+        print("Store does not support compact(); skipping.")
+        return
+
+    if hasattr(store, "save"):
+        store.save()
+
+    start = time.perf_counter()
+    store.compact()
+    end = time.perf_counter()
+
+    total_time_sec = end - start
+
+    print("\nCompact benchmark")
+    print("-----------------")
+    print(f"total time      : {total_time_sec:.4f} sec")
+    print(f"remaining count : {store.count()}")
+
+
 def create_store(store_type: str) -> VectorStore:
     if store_type == "naive":
         return NaiveInMemVectorStore()
@@ -122,6 +182,12 @@ def create_store(store_type: str) -> VectorStore:
         return MatrixBackedInMemVectorStore()
     elif store_type == "buffered-matrix":
         return BufferedMatrixInMemVectorStore()
+    elif store_type == "file":
+        return BufferedMatrixFileVectorStore(
+            records_file="benchmark_file_store/records.jsonl",
+            vectors_file="benchmark_file_store/vectors.npy",
+            tombstones_file="benchmark_file_store/tombstones.txt",
+        )
 
     raise ValueError(f"Unknown store type: {store_type}")
 
@@ -132,26 +198,80 @@ def main():
     )
 
     parser.add_argument("--store",
-                        choices=["naive", "normalized", "matrix", "buffered-matrix"],
+                        choices=["naive", "normalized", "matrix", "buffered-matrix", "file"],
                         default="naive")
     parser.add_argument("--records", type=int, default=10_000)
     parser.add_argument("--dim", type=int, default=384)
     parser.add_argument("--queries", type=int, default=100)
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--delete-count", type=int, default=0)
+    parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--clean-file-store", action="store_true")
 
     args = parser.parse_args()
+
+    if args.store == "file" and args.clean_file_store:
+        clean_file_store_data()
 
     records = generate_records(args.records, args.dim)
     store = create_store(args.store)
 
-    benchmark_insert(store, records)
+    if args.delete_count > 0:
+        undeleted_records = records[args.delete_count:]
+        deleted_records = records[:args.delete_count]
+    else:
+        undeleted_records = records
+        deleted_records = []
 
+    benchmark_insert(store, undeleted_records)
+    if hasattr(store, "save"):
+        store.save()
+
+    if args.delete_count > 0:
+        print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
+        benchmark_search(
+            store=store,
+            num_queries=args.queries,
+            dim=args.dim,
+            top_k=args.top_k,
+        )
+
+    benchmark_insert(store, deleted_records)
+    if hasattr(store, "save"):
+        store.save()
+
+    print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
     benchmark_search(
         store=store,
         num_queries=args.queries,
         dim=args.dim,
         top_k=args.top_k,
     )
+
+    if args.delete_count > 0:
+        benchmark_delete(store, args.delete_count)
+
+        if hasattr(store, "save"):
+            store.save()
+
+        print(f"\nSearch on {store.count()} records. AFTER DELETES")
+        benchmark_search(
+            store=store,
+            num_queries=args.queries,
+            dim=args.dim,
+            top_k=args.top_k,
+        )
+
+    if args.compact:
+        benchmark_compact(store)
+
+        print(f"\nSearch on {store.count()} records. AFTER COMPACT")
+        benchmark_search(
+            store=store,
+            num_queries=args.queries,
+            dim=args.dim,
+            top_k=args.top_k,
+        )
 
 
 if __name__ == "__main__":
