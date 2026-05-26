@@ -11,6 +11,7 @@ from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.file_backed import FileBackedVectorStore
+from vectordb.stores.ivf_inmem import IVFVectorStore
 from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
 from vectordb.stores.mmap_store import MMapVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
@@ -173,6 +174,28 @@ def benchmark_compact(store: VectorStore) -> None:
     print(f"remaining count : {store.count()}")
 
 
+def benchmark_build(store: VectorStore) -> None:
+    if not hasattr(store, "build"):
+        print("\nBuild benchmark")
+        print("----------------")
+        print("Store does not support build(); skipping.")
+        return
+
+    if hasattr(store, "save"):
+        store.save()
+
+    start = time.perf_counter()
+    store.build()
+    end = time.perf_counter()
+
+    total_time_sec = end - start
+
+    print("\nBuild benchmark")
+    print("----------------")
+    print(f"total time      : {total_time_sec:.4f} sec")
+    print(f"remaining count : {store.count()}")
+
+
 def create_store(store_type: str) -> VectorStore:
     if store_type == "naive":
         return NaiveInMemVectorStore()
@@ -182,6 +205,8 @@ def create_store(store_type: str) -> VectorStore:
         return MatrixBackedInMemVectorStore()
     elif store_type == "buffered-matrix":
         return BufferedMatrixInMemVectorStore()
+    elif store_type == "ivf":
+        return IVFVectorStore(nlist=100, nprobe=5, buffer_size=1024)
     elif store_type == "file":
         return FileBackedVectorStore(
             records_file="benchmark_file_store/records.jsonl",
@@ -204,7 +229,7 @@ def main():
     )
 
     parser.add_argument("--store",
-                        choices=["naive", "normalized", "matrix", "buffered-matrix", "file", "mmap"],
+                        choices=["naive", "normalized", "matrix", "buffered-matrix", "ivf", "file", "mmap"],
                         default="naive")
     parser.add_argument("--records", type=int, default=10_000)
     parser.add_argument("--dim", type=int, default=384)
@@ -235,6 +260,7 @@ def main():
         benchmark_insert(store, undeleted_records)
         if hasattr(store, "save"):
             store.save()
+        benchmark_build(store)
 
         if args.delete_count > 0:
             print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
@@ -245,9 +271,10 @@ def main():
                 top_k=args.top_k,
             )
 
-        benchmark_insert(store, deleted_records)
-        if hasattr(store, "save"):
-            store.save()
+            benchmark_insert(store, deleted_records)
+            if hasattr(store, "save"):
+                store.save()
+            benchmark_build(store)
 
     print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
     benchmark_search(

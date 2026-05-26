@@ -12,6 +12,7 @@ python = "^3.12"
 numpy = "^2.4.4"
 sentence-transformers = "^5.4.1"
 pypdf = "^6.11.0"
+scikit-learn = "^1.8.0"
 
 
 [tool.poetry.group.dev.dependencies]
