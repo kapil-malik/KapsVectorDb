@@ -2,11 +2,13 @@ import numpy as np
 
 from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
-from vectordb.stores.buffered_matrix_file import BufferedMatrixFileVectorStore
+from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
+from vectordb.stores.file_backed import FileBackedVectorStore
+from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
+from vectordb.stores.mmap_store import MMapVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
 from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
-from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
-from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
+
 
 def insert_dummy_records(store: VectorStore) -> None:
     store.insert(
@@ -55,23 +57,27 @@ def simple_similarity_test(store: VectorStore) -> None:
 
 
 def main():
-    # print("Testing NaiveInMemVectorStore:")
-    # simple_similarity_test(NaiveInMemVectorStore())
-    #
-    # print("\nTesting NormalizedInMemVectorStore:")
-    # simple_similarity_test(NormalizedInMemVectorStore())
-    #
-    # print("\nTesting MatrixBackedInMemVectorStore:")
-    # simple_similarity_test(MatrixBackedInMemVectorStore())
-    #
-    # print("\nTesting BufferedMatrixInMemVectorStore:")
-    # simple_similarity_test(BufferedMatrixInMemVectorStore())
+    print("Testing NaiveInMemVectorStore:")
+    simple_similarity_test(NaiveInMemVectorStore())
 
-    print("\nTesting BufferedMatrixFileVectorStore:")
-    fvs = BufferedMatrixFileVectorStore()
-    # insert_dummy_records(fvs)
-    # fvs.save()
+    print("\nTesting NormalizedInMemVectorStore:")
+    simple_similarity_test(NormalizedInMemVectorStore())
+
+    print("\nTesting MatrixBackedInMemVectorStore:")
+    simple_similarity_test(MatrixBackedInMemVectorStore())
+
+    print("\nTesting BufferedMatrixInMemVectorStore:")
+    simple_similarity_test(BufferedMatrixInMemVectorStore())
+
+    print("\nTesting FileBackedVectorStore:")
+    fvs = FileBackedVectorStore()
+    insert_dummy_records(fvs)
+    fvs.save()
     search_records(fvs)
+
+    print("\nTesting MMapVectorStore:")
+    mvs = MMapVectorStore()
+    search_records(mvs)
 
 if __name__ == "__main__":
     main()

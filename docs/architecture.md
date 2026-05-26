@@ -98,7 +98,7 @@ This design loosely resembles:
 
 ---
 
-### 5. `BufferedMatrixFileVectorStore`
+### 5. `FileBackedVectorStore`
 
 Adds persistence layer to the buffered matrix store using files on disk.
 

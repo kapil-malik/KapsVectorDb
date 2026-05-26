@@ -1,18 +1,18 @@
 import argparse
-import time
-from statistics import mean
-import os
 import shutil
+import time
 from pathlib import Path
+from statistics import mean
 
 import numpy as np
 from tqdm import tqdm
 
 from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
-from vectordb.stores.buffered_matrix_file import BufferedMatrixFileVectorStore
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
+from vectordb.stores.file_backed import FileBackedVectorStore
 from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
+from vectordb.stores.mmap_store import MMapVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
 from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
 
@@ -183,7 +183,13 @@ def create_store(store_type: str) -> VectorStore:
     elif store_type == "buffered-matrix":
         return BufferedMatrixInMemVectorStore()
     elif store_type == "file":
-        return BufferedMatrixFileVectorStore(
+        return FileBackedVectorStore(
+            records_file="benchmark_file_store/records.jsonl",
+            vectors_file="benchmark_file_store/vectors.npy",
+            tombstones_file="benchmark_file_store/tombstones.txt",
+        )
+    elif store_type == "mmap":
+        return MMapVectorStore(
             records_file="benchmark_file_store/records.jsonl",
             vectors_file="benchmark_file_store/vectors.npy",
             tombstones_file="benchmark_file_store/tombstones.txt",
@@ -198,7 +204,7 @@ def main():
     )
 
     parser.add_argument("--store",
-                        choices=["naive", "normalized", "matrix", "buffered-matrix", "file"],
+                        choices=["naive", "normalized", "matrix", "buffered-matrix", "file", "mmap"],
                         default="naive")
     parser.add_argument("--records", type=int, default=10_000)
     parser.add_argument("--dim", type=int, default=384)
@@ -206,39 +212,42 @@ def main():
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--delete-count", type=int, default=0)
     parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--skip-insert", action="store_true")
     parser.add_argument("--clean-file-store", action="store_true")
 
     args = parser.parse_args()
 
-    if args.store == "file" and args.clean_file_store:
+    if args.store in ["file", "mmap"] and args.clean_file_store:
         clean_file_store_data()
 
-    records = generate_records(args.records, args.dim)
     store = create_store(args.store)
 
-    if args.delete_count > 0:
-        undeleted_records = records[args.delete_count:]
-        deleted_records = records[:args.delete_count]
-    else:
-        undeleted_records = records
-        deleted_records = []
+    if not args.skip_insert:
+        records = generate_records(args.records, args.dim)
 
-    benchmark_insert(store, undeleted_records)
-    if hasattr(store, "save"):
-        store.save()
+        if args.delete_count > 0:
+            undeleted_records = records[args.delete_count:]
+            deleted_records = records[:args.delete_count]
+        else:
+            undeleted_records = records
+            deleted_records = []
 
-    if args.delete_count > 0:
-        print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
-        benchmark_search(
-            store=store,
-            num_queries=args.queries,
-            dim=args.dim,
-            top_k=args.top_k,
-        )
+        benchmark_insert(store, undeleted_records)
+        if hasattr(store, "save"):
+            store.save()
 
-    benchmark_insert(store, deleted_records)
-    if hasattr(store, "save"):
-        store.save()
+        if args.delete_count > 0:
+            print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
+            benchmark_search(
+                store=store,
+                num_queries=args.queries,
+                dim=args.dim,
+                top_k=args.top_k,
+            )
+
+        benchmark_insert(store, deleted_records)
+        if hasattr(store, "save"):
+            store.save()
 
     print(f"\nSearch on {store.count()} records. INSERT ONLY (no deletes yet)")
     benchmark_search(
@@ -250,9 +259,6 @@ def main():
 
     if args.delete_count > 0:
         benchmark_delete(store, args.delete_count)
-
-        if hasattr(store, "save"):
-            store.save()
 
         print(f"\nSearch on {store.count()} records. AFTER DELETES")
         benchmark_search(

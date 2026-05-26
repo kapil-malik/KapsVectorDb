@@ -7,7 +7,7 @@ from vectordb.filters import metadata_matches
 from vectordb.models import SearchResult, VectorRecord
 
 
-class BufferedMatrixFileVectorStore:
+class FileBackedVectorStore:
 
     def __init__(
             self,

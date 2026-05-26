@@ -114,7 +114,7 @@ Understand how real vector databases persist data and support filtered retrieval
 - Append-only segment files
 - Reloadable vector database
 
-#### M3.2 — `MMapVectorStore` ⏳
+#### M3.2 — `MMapVectorStore` ✅
 - Memory-mapped vector storage
 - OS page cache behavior
 - Larger-than-memory dataset handling
