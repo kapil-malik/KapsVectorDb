@@ -163,3 +163,78 @@ O(N × D)
 Where:
 - `N` = number of vectors
 - `D` = vector dimensions
+## PDF ANN Store Benchmark
+
+A benchmark was run to compare exact search, IVF, and Flat NSW on a real PDF-based retrieval workload.
+
+### Benchmark Setup
+
+```commandline
+poetry run python benchmarks/benchmark_pdf_ann_stores.py \
+  --pdf The_DynamoDb_Book.pdf \
+  --queries-file ./benchmarks/data/pdf_queries.txt \
+  --output-csv ./benchmarks/results/pdf_ann_results.csv \
+  --top-k 5 \
+  --ivf-nlist 10,20,40 \
+  --ivf-nprobe 1,5,10 \
+  --nsw-m 8,16 \
+  --nsw-ef-search 16,32,64
+```
+
+Dataset:
+- PDF: *The DynamoDB Book*
+- Records: 881 PDF chunks
+- Queries: 50 semantic queries
+- Embedding model: Sentence Transformer
+- `top_k`: 5
+
+Stores compared:
+- `BufferedMatrixInMemVectorStore` as the exact baseline
+- `IVFVectorStore`
+- `FlatNSWVectorStore`
+
+### Results
+
+| Store | Parameters | Prepare Time | p95 Search Latency | Avg Recall@5 |
+|---|---|---:|---:|---:|
+| Exact | `{}` | 0.003 sec | 0.431 ms | 1.000 |
+| IVF | `nlist=10, nprobe=1` | 0.136 sec | 0.060 ms | 0.676 |
+| IVF | `nlist=10, nprobe=5` | 0.029 sec | 0.139 ms | 0.996 |
+| IVF | `nlist=10, nprobe=10` | 0.033 sec | 0.127 ms | 1.000 |
+| IVF | `nlist=20, nprobe=1` | 0.031 sec | 0.047 ms | 0.524 |
+| IVF | `nlist=20, nprobe=5` | 0.032 sec | 0.091 ms | 0.940 |
+| IVF | `nlist=20, nprobe=10` | 0.031 sec | 0.131 ms | 0.992 |
+| IVF | `nlist=40, nprobe=1` | 0.068 sec | 0.037 ms | 0.528 |
+| IVF | `nlist=40, nprobe=5` | 0.066 sec | 0.075 ms | 0.908 |
+| IVF | `nlist=40, nprobe=10` | 0.067 sec | 0.090 ms | 0.972 |
+| Flat NSW | `m=8, ef_search=16` | 0.306 sec | 0.096 ms | 0.624 |
+| Flat NSW | `m=8, ef_search=32` | 0.293 sec | 0.156 ms | 0.784 |
+| Flat NSW | `m=8, ef_search=64` | 0.294 sec | 0.262 ms | 0.892 |
+| Flat NSW | `m=16, ef_search=16` | 0.460 sec | 0.140 ms | 0.888 |
+| Flat NSW | `m=16, ef_search=32` | 0.437 sec | 0.219 ms | 0.952 |
+| Flat NSW | `m=16, ef_search=64` | 0.441 sec | 0.335 ms | 0.996 |
+
+### Key Learnings
+
+IVF shows the expected `nprobe` tradeoff:
+
+```text
+lower nprobe -> lower latency, lower recall
+higher nprobe -> higher recall, higher latency
+```
+
+Flat NSW shows the expected graph-search tradeoff:
+```text
+higher ef_search -> better recall, higher latency
+higher m -> denser graph, better recall, higher insert cost
+```
+
+The best IVF configurations achieved near-exact recall with much lower p95 latency than exact search.
+
+Flat NSW also reached near-exact recall, but with higher preparation time because the current implementation uses brute-force neighbor discovery during insert.
+
+This benchmark demonstrates the difference between two ANN strategies:
+```text
+IVF      -> partition then scan
+Flat NSW -> navigate then refine
+```

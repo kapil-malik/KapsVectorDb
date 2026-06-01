@@ -111,6 +111,79 @@ Key idea:
 - Periodically flush buffer to disk in batches.
 - Support soft deletes via tombstoning.
 
+
+### 6. `MMapVectorStore`
+
+Read-optimized vector store backed by a memory-mapped NumPy matrix.
+
+Key idea:
+- Load vectors using NumPy mmap instead of fully loading them into RAM.
+- Allow the operating system to lazily page vector data from disk.
+
+This store loads:
+- metadata from records.jsonl
+- vectors from vectors.npy using mmap_mode="r"
+- tombstones from tombstones.txt
+
+Benefits:
+- Faster startup for persisted vector stores.
+- Enables searching larger-than-memory vector datasets.
+
+Tradeoff:
+- Search latency may increase due to disk page faults and I/O.
+
+### 7. `IVFInMemVectorStore`
+
+In-memory IVF (Inverted File Index) vector store.
+
+Key idea:
+- Partition vectors into clusters using KMeans.
+- Search only a subset of clusters during query time.
+
+Build process:
+- Store normalized vectors.
+- Build KMeans centroids.
+- Assign each vector to its nearest centroid.
+- Maintain inverted lists:
+      centroid_id -> vector row indices
+
+Search process:
+- Find nearest `nprobe` centroids.
+- Search only vectors belonging to those centroid lists.
+
+Benefits:
+- Significantly reduces vectors scanned per query.
+- Improves search latency compared to brute-force search.
+
+Tradeoff:
+- Lower `nprobe` improves latency but reduces recall.
+
+### 8. `FlatNSWVectorStore`
+
+Flat Navigable Small World (NSW) graph-based ANN vector store.
+
+Key idea:
+- Maintain graph connections between neighboring vectors.
+- Perform approximate search via graph traversal.
+
+Insert process:
+- Connect each new vector to nearby existing vectors.
+- Maintain bounded neighbor lists per node.
+
+Search process:
+- Start from an entry point.
+- Traverse increasingly similar neighbors using best-first search.
+
+Benefits:
+- Excellent recall vs latency tradeoff.
+- Naturally supports incremental inserts.
+
+Tradeoff:
+- Higher memory usage due to graph edges.
+- More complex insertion and graph maintenance logic.
+
+This is currently a single-layer NSW graph, not full HNSW yet.
+
 ### Store Comparison
 
 | Store | Insert | Search | Persistence | Scalability |
@@ -120,3 +193,6 @@ Key idea:
 | `MatrixBackedInMemVectorStore` | O(N × D) (matrix operations) | O(N × D) (vectorized operations) | No | O(N) memory | 
 | `BufferedMatrixInMemVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized operations) | No | O(N) memory |
 | `BufferedMatrixFileVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized operations) | Yes | Disk-backed |
+| `MMapVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized mmap search) | Yes | Larger-than-memory datasets |
+| `IVFVectorStore` | O(B × D) + build step | O((N / nlist) × nprobe × D) approximate search | No | ANN search with clustering |
+| `FlatNSWVectorStore` | O(N × D) (graph neighbor discovery) | Approximate graph traversal | No | ANN search with graph index |
