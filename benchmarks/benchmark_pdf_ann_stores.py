@@ -18,7 +18,7 @@ from vectordb.models import VectorRecord
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.flat_nsw_inmem import FlatNSWVectorStore
 from vectordb.stores.ivf_inmem import IVFVectorStore
-
+from vectordb.stores.hnsw_inmem import HNSWVectorStore
 
 @dataclass(frozen=True)
 class BenchmarkRow:
@@ -183,12 +183,22 @@ def main():
     parser.add_argument("--nsw-m", default="8,16")
     parser.add_argument("--nsw-ef-search", default="16,32,64")
 
+    parser.add_argument("--hnsw-m", default="8,16")
+    parser.add_argument("--hnsw-ef-construction", default="32,64,128")
+    parser.add_argument("--hnsw-ef-search", default="16,32,64")
+    parser.add_argument("--hnsw-level-multiplier", default="1.0")
+
     args = parser.parse_args()
 
     ivf_nlists = parse_int_list(args.ivf_nlist)
     ivf_nprobes = parse_int_list(args.ivf_nprobe)
     nsw_ms = parse_int_list(args.nsw_m)
     nsw_ef_search_values = parse_int_list(args.nsw_ef_search)
+    hnsw_ms = parse_int_list(args.hnsw_m)
+    hnsw_ef_construction_values = parse_int_list(args.hnsw_ef_construction)
+    hnsw_ef_search_values = parse_int_list(args.hnsw_ef_search)
+    hnsw_level_multiplier = float(args.hnsw_level_multiplier)
+
     buffer_size = args.buffer_size
     top_k = args.top_k
 
@@ -259,6 +269,23 @@ def main():
         )
         rows.append(benchmark_row.__dict__)
 
+
+    for m, ef_construction, ef_search in itertools.product(
+        hnsw_ms,
+        hnsw_ef_construction_values,
+        hnsw_ef_search_values,
+    ):
+        benchmark_row = run_hnsw_benchmark(
+            records=records,
+            query_vectors=query_vectors,
+            exact_result_ids_by_query=exact_result_ids_by_query,
+            top_k=top_k,
+            m=m,
+            ef_construction=ef_construction,
+            ef_search=ef_search,
+            level_multiplier=hnsw_level_multiplier,
+        )
+        rows.append(benchmark_row.__dict__)
 
     output_path = Path(args.output_csv)
 
@@ -410,6 +437,66 @@ def run_flat_nsw_benchmark(
     )
     return flat_nsw_benchmark_row
 
+
+def run_hnsw_benchmark(
+        records: list[VectorRecord],
+        query_vectors: list[np.ndarray],
+        exact_result_ids_by_query: list[list[str]],
+        top_k: int,
+        m: int,
+        ef_construction: int,
+        ef_search: int,
+        level_multiplier: float) -> BenchmarkRow:
+
+    print(
+        f"\nBenchmarking HNSW "
+        f"m={m}, ef_construction={ef_construction}, "
+        f"ef_search={ef_search}, level_multiplier={level_multiplier}"
+    )
+
+    store = HNSWVectorStore(
+        m=m,
+        ef_construction=ef_construction,
+        ef_search=ef_search,
+        level_multiplier=level_multiplier,
+    )
+
+    insert_time_sec = insert_records(store, records)
+    build_time_sec = maybe_build_store(store)
+
+    for query_vector in query_vectors[: min(5, len(query_vectors))]:
+        store.search(query_vector=query_vector, top_k=top_k)
+
+    latencies_ms, recalls = evaluate_store(
+        store=store,
+        query_vectors=query_vectors,
+        exact_result_ids_by_query=exact_result_ids_by_query,
+        top_k=top_k,
+    )
+
+    return BenchmarkRow(
+        store="hnsw",
+        store_parameters=params_to_json(
+            {
+                "m": m,
+                "ef_construction": ef_construction,
+                "ef_search": ef_search,
+                "level_multiplier": level_multiplier,
+            }
+        ),
+        records=len(records),
+        queries=len(query_vectors),
+        insert_time_sec=insert_time_sec,
+        build_time_sec=build_time_sec,
+        prepare_time_sec=insert_time_sec + build_time_sec,
+        search_avg_latency_ms=mean(latencies_ms),
+        search_p50_latency_ms=percentile(latencies_ms, 50),
+        search_p95_latency_ms=percentile(latencies_ms, 95),
+        search_p99_latency_ms=percentile(latencies_ms, 99),
+        recall_avg=mean(recalls),
+        recall_p50=percentile(recalls, 50),
+        recall_p95=percentile(recalls, 95),
+    )
 
 if __name__ == "__main__":
     main()

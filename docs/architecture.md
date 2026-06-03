@@ -184,6 +184,41 @@ Tradeoff:
 
 This is currently a single-layer NSW graph, not full HNSW yet.
 
+### 9. `HNSWVectorStore`
+
+Hierarchical Navigable Small World (HNSW) graph-based ANN vector store.
+
+Key idea:
+
+* Organize vectors into multiple graph layers of increasing sparsity.
+* Upper sparse layers enable fast long-distance navigation.
+* Lower dense layers refine local nearest-neighbor search.
+
+Insert process:
+
+* Assign each vector a random maximum level.
+* Navigate greedily from top layers toward the vector's region.
+* Connect the vector to nearby neighbors on participating layers.
+
+Search process:
+
+* Start from the top-layer entry point.
+* Perform greedy descent through upper layers.
+* Run wider best-first search on the bottom layer.
+
+Benefits:
+
+* Excellent recall with low search latency at large scale.
+* Faster navigation than single-layer NSW graphs.
+* Incremental inserts without full index rebuilds.
+
+Tradeoff:
+
+* More complex graph maintenance and insertion logic.
+* Additional memory overhead from multi-layer graph edges.
+* Insert latency is higher than simpler ANN structures.
+
+
 ### Store Comparison
 
 | Store | Insert | Search | Persistence | Scalability |
@@ -196,3 +231,4 @@ This is currently a single-layer NSW graph, not full HNSW yet.
 | `MMapVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized mmap search) | Yes | Larger-than-memory datasets |
 | `IVFVectorStore` | O(B × D) + build step | O((N / nlist) × nprobe × D) approximate search | No | ANN search with clustering |
 | `FlatNSWVectorStore` | O(N × D) (graph neighbor discovery) | Approximate graph traversal | No | ANN search with graph index |
+| `HNSWVectorStore` | O(log N) layer navigation + graph maintenance | Approximate hierarchical graph traversal | No | ANN search with hierarchical graph index |

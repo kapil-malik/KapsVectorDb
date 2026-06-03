@@ -124,17 +124,40 @@ Understand how real vector databases persist data and support filtered retrieval
 ### Phase 4 — Approximate Nearest Neighbor (ANN)
 
 Goal:
-Understand how modern vector databases scale similarity search.
+Understand how modern vector databases scale similarity search using partition-based and graph-based approximate indexing.
 
-#### M4.1 — `IVFVectorStore` ⏳
-- Inverted File Index (IVF)
-- Clustering-based ANN search
+#### M4.1 — `IVFVectorStore` ✅
+- Inverted File Index
+- KMeans clustering
+- `nlist` / `nprobe`
 - Recall vs latency tradeoffs
 
-#### M4.2 — `HNSWVectorStore` ⏳
-- Hierarchical Navigable Small World graphs
-- Graph-based ANN search
-- Fast approximate nearest neighbor traversal
+#### M4.2 — `FlatNSWVectorStore` ✅
+- Single-layer navigable small-world graph
+- Best-first graph traversal
+- `m` and `ef_search`
+- Graph connectivity vs recall tradeoffs
+
+#### M4.3 — `HNSWVectorStore` ✅
+- Hierarchical graph layers
+- Probabilistic level assignment
+- Entry-point based search
+- Layer-by-layer greedy descent
+- Bottom-layer ef_search refinement
+
+#### M4.4 — ANN Instrumentation & Diagnostics ⏳
+- Track visited nodes
+- Track candidate expansions
+- Track vectors scanned
+- Track graph hops
+- Track IVF clusters scanned
+- Compare recall vs actual work done
+
+#### M4.5 — ANN Visualization ⏳
+- Small-dataset graph visualization
+- NSW/HNSW traversal path visualization
+- IVF cluster visualization
+- Recall/latency/work curves
 
 ---
 
