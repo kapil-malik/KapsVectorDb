@@ -20,7 +20,7 @@ Usage:
     poetry run python visualizations/visualize_ann_benchmark_results.py
     poetry run python visualizations/visualize_ann_benchmark_results.py \\
         --input-csv benchmarks/results/pdf_ann_results_3.csv \\
-        --output-dir visualizations/output
+        --output-dir visualizations/output/benchmark
 """
 
 import argparse
@@ -399,7 +399,7 @@ def main() -> None:
     default_csv = (
         Path(__file__).parent.parent / "benchmarks" / "results" / "pdf_ann_results_3.csv"
     )
-    default_out = Path(__file__).parent / "output"
+    default_out = Path(__file__).parent / "output" / "benchmark"
 
     parser = argparse.ArgumentParser(description="Visualize ANN benchmark results")
     parser.add_argument(
