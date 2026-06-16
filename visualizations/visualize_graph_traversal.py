@@ -141,20 +141,38 @@ def traverse_hnsw(
     query_norm: np.ndarray,
     top_k: int,
     level: int,
-) -> tuple[list[str], list[tuple[float, str]]]:
-    diag = SearchDiagnostics(visited_node_ids=[])
+) -> tuple[list[str], list[tuple[float, str]], str | None]:
+    # Navigate to the target level without tracking (untracked descent)
     current = store._entry_point_id
+    for lv in range(store._max_level, level, -1):
+        current = store._greedy_search_layer(query_norm, current, lv)
 
-    for lv in range(store._max_level, 0, -1):
-        current = store._greedy_search_layer(query_norm, current, lv, diag)
+    level_entry_id = current  # actual entry point into the level-L search
 
-    best = store._search_layer(query_norm, current, 0, store.ef_search, diag)
-    best.sort(key=lambda x: x[0], reverse=True)
-    results = [
-        (s, rid) for s, rid in best
-        if rid not in store._tombstone_ids
-    ][:top_k]
-    return diag.visited_node_ids or [], results
+    # Track only the search phase at the selected level
+    diag = SearchDiagnostics(visited_node_ids=[])
+    if level == 0:
+        best = store._search_layer(query_norm, current, 0, store.ef_search, diag)
+        best.sort(key=lambda x: x[0], reverse=True)
+        results = [
+            (s, rid) for s, rid in best
+            if rid not in store._tombstone_ids
+        ][:top_k]
+    else:
+        # Track greedy search at exactly this level
+        store._greedy_search_layer(query_norm, current, level, diag)
+        # Get actual top-k results via separate untracked full search
+        full_current = store._entry_point_id
+        for lv in range(store._max_level, 0, -1):
+            full_current = store._greedy_search_layer(query_norm, full_current, lv)
+        best = store._search_layer(query_norm, full_current, 0, store.ef_search)
+        best.sort(key=lambda x: x[0], reverse=True)
+        results = [
+            (s, rid) for s, rid in best
+            if rid not in store._tombstone_ids
+        ][:top_k]
+
+    return diag.visited_node_ids or [], results, level_entry_id
 
 
 # ── graph structure helpers ───────────────────────────────────────────────────
@@ -435,7 +453,9 @@ def main() -> None:
     if args.store == "flat_nsw":
         visited_ids, results = traverse_flat_nsw(store, query_norm, args.top_k)
     else:
-        visited_ids, results = traverse_hnsw(store, query_norm, args.top_k, args.level)
+        visited_ids, results, entry_point_id = traverse_hnsw(
+            store, query_norm, args.top_k, args.level
+        )
 
     result_ids = {rid for _, rid in results}
     print(f"  Visited: {len(set(visited_ids))} unique nodes")

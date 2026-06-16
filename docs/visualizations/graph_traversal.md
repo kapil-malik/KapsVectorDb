@@ -88,15 +88,20 @@ poetry run python visualizations/visualize_graph_traversal.py \
 | Small gray dots | Light gray, low alpha | Nodes not visited during this search |
 | Larger orange dots | Orange, medium alpha | Nodes visited (explored) during search |
 | Larger green dots | Green, white edge | Top-k result nodes |
-| Blue diamond `◆` | Blue, white edge | Entry point (search starts here) |
+| Blue diamond `◆` | Blue, white edge | Entry point for the search at the selected layer (for HNSW, this is the level-L entry after untracked greedy descent, not the global top-layer entry) |
 | Red star `★` | Red, black edge | Query vector (projected to 2D) |
 | Faint gray lines | Very low alpha | All graph edges at this layer |
 | Orange lines | Medium alpha | Traversal edges (both endpoints visited) |
 
-**How traversal is tracked:** A new opt-in field `visited_node_ids: list[str] | None` was
-added to `SearchDiagnostics`. Normal search paths leave it `None` (zero overhead). The
-visualization script opts in by passing `SearchDiagnostics(visited_node_ids=[])` to the
-internal helper methods, which append each node ID as it is added to the visited set.
+**How traversal is tracked:** An opt-in field `visited_node_ids: list[str] | None` was added to
+`SearchDiagnostics`. Normal search paths leave it `None` (zero overhead). The visualization
+script opts in by passing `SearchDiagnostics(visited_node_ids=[])` to the internal helper
+methods, which append each node ID as it enters the visited set.
+
+For HNSW, tracking is **level-isolated**: the script descends from the top layer to the target
+level without recording any nodes, then tracks only the search phase at the selected level.
+This means orange nodes on a level-L plot are exclusively the nodes scored during that layer's
+search — upper-layer greedy descent and base-layer beam activity on other levels are excluded.
 
 ---
 
@@ -123,16 +128,18 @@ reflecting the ef_search=32 candidate pool limiting expansion after the beam fil
 
 ```
 --store hnsw --max-chunks 200 --m 8 --ef-search 32 --level 0 --query-index 0
-200 nodes · 1169 edges · 92 unique nodes visited
+200 nodes · 1180 edges · 83 unique nodes visited
 ```
 
 ![HNSW level 0 graph traversal](../../visualizations/output/graph_traversal/graph_hnsw_m8_ef32_chunks200_lvl0_q0.png)
 
 HNSW level 0 is the densest layer — every node participates and has up to M=8 bidirectional
-links, giving 1169 edges versus FlatNSW's 800. The search first descends greedily through upper
-layers to find a good entry candidate, then runs a wider ef_search=32 beam at level 0. The
-visited count (92) is slightly higher than FlatNSW (77) because HNSW's greedy descent through
-levels 1–5 adds extra nodes to `visited_node_ids` before the base-layer beam even starts.
+links. The search first descends greedily through upper layers to find a good entry candidate
+(untracked). The blue diamond marks where the level-0 beam search actually starts — the node
+handed off by the untracked greedy descent. From there, the ef_search=32 beam expands outward;
+all nodes it visits are shown in orange, with orange edges connecting visited pairs. The visited
+count (83) is comparable to FlatNSW (77) because both now reflect exclusively the base-layer
+beam, making the comparison fair.
 
 ---
 
@@ -140,16 +147,16 @@ levels 1–5 adds extra nodes to `visited_node_ids` before the base-layer beam e
 
 ```
 --store hnsw --max-chunks 200 --m 8 --ef-search 32 --level 1 --query-index 0
-80 nodes at level 1 · 475 edges · 88 nodes in visited_node_ids
+72 nodes at level 1 · 437 edges · 13 unique nodes visited
 ```
 
 ![HNSW level 1 graph traversal](../../visualizations/output/graph_traversal/graph_hnsw_m8_ef32_chunks200_lvl1_q0.png)
 
-Level 1 is sparser — only ~40% of the 200 nodes are promoted here, and edges show the
-long-range shortcuts that make upper-layer greedy descent fast. `visited_node_ids` at this
-level captures all nodes scored during the full search (greedy descent across all levels +
-base-layer beam), so the visited count appears large relative to the layer. The greedy path
-through level 1 typically touches only a handful of nodes (following the best neighbor each
-step), but the base-layer beam dominates the total count. The sparse long-range structure
-explains why HNSW's greedy descent converges quickly — upper-layer edges span large distances
-in embedding space.
+Level 1 is sparser — only ~36% of the 200 nodes are promoted here, and edges show the
+long-range shortcuts that make upper-layer navigation fast. The blue diamond marks the actual
+entry into the level-1 greedy search — the node handed off by the untracked descent from higher
+layers. From it, the greedy walk follows the single best neighbor at each step, visiting only
+13 nodes before converging. Orange edges connect visited pairs within the level-1 graph,
+so the traversal path is fully visible and correctly rooted at the blue diamond. This accurately
+captures how upper layers behave: a tight greedy walk that quickly narrows the search region
+before handing off to the denser base layer.
