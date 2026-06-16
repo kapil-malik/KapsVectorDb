@@ -3,6 +3,8 @@ from vectordb.embeddings.sentence_transformer import SentenceTransformerEmbeddin
 from vectordb.retrieval.semantic_text_retriever import SemanticTextRetriever
 from vectordb.store_base import VectorStore
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
+from vectordb.stores.flat_nsw_inmem import FlatNSWVectorStore
+from vectordb.stores.hnsw_inmem import HNSWVectorStore
 from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
 from vectordb.stores.normalized_inmem import NormalizedInMemVectorStore
@@ -68,7 +70,13 @@ def main():
     demo_retrieval(embedding_model, MatrixBackedInMemVectorStore())
 
     print("\nDemonstrating retrieval with BufferedMatrixInMemVectorStore:")
-    demo_retrieval(embedding_model,  BufferedMatrixInMemVectorStore())
+    demo_retrieval(embedding_model, BufferedMatrixInMemVectorStore())
+
+    print("\nDemonstrating retrieval with FlatNSWVectorStore:")
+    demo_retrieval(embedding_model, FlatNSWVectorStore())
+
+    print("\nDemonstrating retrieval with HNSWVectorStore:")
+    demo_retrieval(embedding_model, HNSWVectorStore())
 
 
 if __name__ == "__main__":

@@ -4,6 +4,9 @@ from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.file_backed import FileBackedVectorStore
+from vectordb.stores.flat_nsw_inmem import FlatNSWVectorStore
+from vectordb.stores.hnsw_inmem import HNSWVectorStore
+from vectordb.stores.ivf_inmem import IVFVectorStore
 from vectordb.stores.matrix_inmem import MatrixBackedInMemVectorStore
 from vectordb.stores.mmap_store import MMapVectorStore
 from vectordb.stores.naive_inmem import NaiveInMemVectorStore
@@ -78,6 +81,20 @@ def main():
     print("\nTesting MMapVectorStore:")
     mvs = MMapVectorStore()
     search_records(mvs)
+
+    # IVF requires an explicit build() step after all inserts.
+    # nlist=2 is used here because the dummy dataset only has 3 vectors.
+    print("\nTesting IVFVectorStore:")
+    ivf = IVFVectorStore(nlist=2, nprobe=1)
+    insert_dummy_records(ivf)
+    ivf.build()
+    search_records(ivf)
+
+    print("\nTesting FlatNSWVectorStore:")
+    simple_similarity_test(FlatNSWVectorStore())
+
+    print("\nTesting HNSWVectorStore:")
+    simple_similarity_test(HNSWVectorStore())
 
 if __name__ == "__main__":
     main()
