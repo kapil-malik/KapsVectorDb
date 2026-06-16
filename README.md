@@ -39,6 +39,11 @@ What it demonstrates:
 - NormalizedInMemVectorStore
 - MatrixBackedInMemVectorStore
 - BufferedMatrixInMemVectorStore
+- FileBackedVectorStore
+- MMapVectorStore
+- IVFVectorStore
+- FlatNSWVectorStore
+- HNSWVectorStore
 
 **2) main_chunker_compare.py — Chunking Strategy Comparison**
 
@@ -62,10 +67,12 @@ Run:
 poetry run python -m vectordb.main_retriever
 ```
 
-What it does:
+What it demonstrates:
 - Initializes `SentenceTransformerEmbeddingModel`.
 - Indexes a handful of sample chunks with metadata.
 - Runs a semantic query and prints top results with scores and metadata.
+- Demonstrates metadata filtering on results.
+- Covers: NaiveInMemVectorStore, NormalizedInMemVectorStore, MatrixBackedInMemVectorStore, BufferedMatrixInMemVectorStore, FlatNSWVectorStore, HNSWVectorStore.
 
 **4) main_pdf_retriever.py — PDF-based Semantic Search**
 
@@ -74,17 +81,19 @@ Loads a PDF, chunk it, index with embeddings, and search over the content.
 Run (example):
 ```bash
 poetry run python -m vectordb.main_pdf_retriever --pdf ./The_DynamoDb_Book.pdf --query "partitioning" --top-k 3
+poetry run python -m vectordb.main_pdf_retriever --pdf ./The_DynamoDb_Book.pdf --query "partitioning" --store hnsw
 ```
 
 Arguments:
 - `--pdf` (required): Path to the PDF file to index.
 - `--query` (required): Search query string.
 - `--top-k` (optional): Number of top results to return (default: 5).
+- `--store` (optional): Vector store to use — `naive`, `normalized`, `matrix`, `buffered`, `ivf`, `flat_nsw`, `hnsw` (default: `buffered`).
 
 What it does:
 - Uses `chunks_from_pdf` to split the PDF into chunks.
 - Uses `SentenceTransformerEmbeddingModel` to create embeddings.
-- Indexes chunks into `BufferedMatrixInMemVectorStore`.
+- Indexes chunks into the chosen vector store.
 - Performs semantic search and prints top-k matches.
 
 ## Roadmap Summary
