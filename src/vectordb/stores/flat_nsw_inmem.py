@@ -8,7 +8,7 @@ import numpy as np
 
 from vectordb.distance import dot_similarity
 from vectordb.filters import metadata_matches
-from vectordb.models import SearchResult, VectorRecord
+from vectordb.models import SearchDiagnostics, SearchResult, VectorRecord
 
 
 class FlatNSWVectorStore:
@@ -106,8 +106,19 @@ class FlatNSWVectorStore:
             query_vector: np.ndarray,
             top_k: int = 5,
             filters: dict[str, Any] | None = None) -> list[SearchResult]:
+        results, _ = self.search_with_diagnostics(query_vector, top_k, filters)
+        return results
+
+    def search_with_diagnostics(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None,
+    ) -> tuple[list[SearchResult], SearchDiagnostics]:
+        diag = SearchDiagnostics(layers_traversed=1)
+
         if self._entry_point_id is None:
-            return []
+            return [], diag
 
         if top_k <= 0:
             raise ValueError("top_k must be positive")
@@ -124,9 +135,8 @@ class FlatNSWVectorStore:
 
         normalized_query_vector = (query_vector / norm).astype(np.float32)
 
-        # Perform search using the entry point
-        best_candidates = self._search_with_entry_point(normalized_query_vector)
-        best_candidates.sort(key=lambda x: x[0], reverse=True)  # Sort by score descending
+        best_candidates = self._search_with_entry_point(normalized_query_vector, diag)
+        best_candidates.sort(key=lambda x: x[0], reverse=True)
 
         results: list[SearchResult] = []
 
@@ -146,7 +156,7 @@ class FlatNSWVectorStore:
             if len(results) >= top_k:
                 break
 
-        return results
+        return results, diag
 
 
     # Prune if the record_id has more than M neighbors, keep only the top M most similar neighbors.
@@ -182,7 +192,11 @@ class FlatNSWVectorStore:
         return [record_id for record_id, _ in top_neighbors]
 
 
-    def _search_with_entry_point(self, normalized_query_vector: np.ndarray) -> list[tuple[float, str]]:
+    def _search_with_entry_point(
+            self,
+            normalized_query_vector: np.ndarray,
+            diag: SearchDiagnostics | None = None,
+    ) -> list[tuple[float, str]]:
         visited = set()
 
         # Min heap by negative score, so best score comes first.
@@ -194,10 +208,12 @@ class FlatNSWVectorStore:
 
         entry_id = self._entry_point_id
         entry_score = dot_similarity(normalized_query_vector, self._vectors[entry_id])
+        if diag: diag.distance_computations += 1
 
         heapq.heappush(candidates, (-entry_score, entry_id))
         heapq.heappush(best_results, (entry_score, entry_id))
         visited.add(entry_id)
+        if diag: diag.visited_nodes += 1
 
         while candidates:
             current_score, current_id = heapq.heappop(candidates)
@@ -211,13 +227,15 @@ class FlatNSWVectorStore:
                 break
 
             for neighbor_id in self._neighbors[current_id]:
+                if diag: diag.graph_hops += 1
                 if neighbor_id in visited or neighbor_id in self._tombstone_ids:
                     continue
 
                 visited.add(neighbor_id)
+                if diag: diag.visited_nodes += 1
 
-                neighbor_vector = self._vectors[neighbor_id]
-                neighbor_score = dot_similarity(normalized_query_vector, neighbor_vector)
+                neighbor_score = dot_similarity(normalized_query_vector, self._vectors[neighbor_id])
+                if diag: diag.distance_computations += 1
 
                 # If we have room in results, add it.
                 if len(best_results) < self.ef_search or neighbor_score > lowest_score:

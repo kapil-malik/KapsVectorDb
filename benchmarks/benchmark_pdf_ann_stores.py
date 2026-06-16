@@ -14,7 +14,7 @@ from tqdm import tqdm
 from vectordb.embeddings.sentence_transformer import SentenceTransformerEmbeddingModel
 from vectordb.ingestion.chunker import RecursiveTextChunker
 from vectordb.ingestion.pdf_ingestion import chunks_from_pdf
-from vectordb.models import VectorRecord
+from vectordb.models import SearchDiagnostics, VectorRecord
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.flat_nsw_inmem import FlatNSWVectorStore
 from vectordb.stores.ivf_inmem import IVFVectorStore
@@ -36,6 +36,12 @@ class BenchmarkRow:
     recall_avg: float
     recall_p50: float
     recall_p95: float
+    diag_avg_distance_computations: int = 0
+    diag_avg_visited_nodes: int = 0
+    diag_avg_graph_hops: int = 0
+    diag_avg_layers_traversed: int = 0
+    diag_avg_clusters_scanned: int = 0
+    diag_avg_vectors_scanned: int = 0
 
 
 def percentile(values: list[float], p: float) -> float:
@@ -113,14 +119,6 @@ def maybe_build_store(store) -> float:
     return 0.0
 
 
-def search_with_latency(store, query_vector, top_k: int):
-    start = time.perf_counter()
-    results = store.search(query_vector=query_vector, top_k=top_k)
-    end = time.perf_counter()
-
-    return results, (end - start) * 1000
-
-
 def recall_at_k(exact_ids: list[str], candidate_ids: list[str], k: int) -> float:
     exact_top_k = set(exact_ids[:k])
     candidate_top_k = set(candidate_ids[:k])
@@ -131,19 +129,41 @@ def recall_at_k(exact_ids: list[str], candidate_ids: list[str], k: int) -> float
     return len(exact_top_k.intersection(candidate_top_k)) / k
 
 
+def avg_diagnostics(diags: list[SearchDiagnostics]) -> SearchDiagnostics:
+    if not diags:
+        return SearchDiagnostics()
+    return SearchDiagnostics(
+        distance_computations=round(mean(d.distance_computations for d in diags)),
+        visited_nodes=round(mean(d.visited_nodes for d in diags)),
+        graph_hops=round(mean(d.graph_hops for d in diags)),
+        layers_traversed=round(mean(d.layers_traversed for d in diags)),
+        clusters_scanned=round(mean(d.clusters_scanned for d in diags)),
+        vectors_scanned=round(mean(d.vectors_scanned for d in diags)),
+    )
+
+
 def evaluate_store(
         store,
         query_vectors,
         exact_result_ids_by_query: list[list[str]] | None,
         top_k: int,
-) -> tuple[list[float], list[float]]:
+) -> tuple[list[float], list[float], SearchDiagnostics]:
     latencies_ms: list[float] = []
     recalls: list[float] = []
+    diags: list[SearchDiagnostics] = []
+
+    has_diagnostics = hasattr(store, "search_with_diagnostics")
 
     for i, query_vector in enumerate(query_vectors):
-        results, latency_ms = search_with_latency(store, query_vector, top_k)
+        start = time.perf_counter()
+        if has_diagnostics:
+            results, diag = store.search_with_diagnostics(query_vector=query_vector, top_k=top_k)
+            diags.append(diag)
+        else:
+            results = store.search(query_vector=query_vector, top_k=top_k)
+        end = time.perf_counter()
 
-        latencies_ms.append(latency_ms)
+        latencies_ms.append((end - start) * 1000)
 
         if exact_result_ids_by_query is not None:
             candidate_ids = [result.record.id for result in results]
@@ -155,7 +175,7 @@ def evaluate_store(
                 )
             )
 
-    return latencies_ms, recalls
+    return latencies_ms, recalls, avg_diagnostics(diags)
 
 
 def parse_int_list(value: str) -> list[int]:
@@ -311,7 +331,7 @@ def run_exact_benchmark(
     # Warmup
     for query_vector in query_vectors[: min(5, len(query_vectors))]:
         exact_store.search(query_vector=query_vector, top_k=top_k)
-    exact_latencies_ms, _ = evaluate_store(
+    exact_latencies_ms, _, _ = evaluate_store(
         store=exact_store,
         query_vectors=query_vectors,
         exact_result_ids_by_query=None,
@@ -360,7 +380,7 @@ def run_ivf_benchmark(
     build_time_sec = maybe_build_store(store)
     for query_vector in query_vectors[: min(5, len(query_vectors))]:
         store.search(query_vector=query_vector, top_k=top_k)
-    latencies_ms, recalls = evaluate_store(
+    latencies_ms, recalls, diag = evaluate_store(
         store=store,
         query_vectors=query_vectors,
         exact_result_ids_by_query=exact_result_ids_by_query,
@@ -386,6 +406,12 @@ def run_ivf_benchmark(
         recall_avg=mean(recalls),
         recall_p50=percentile(recalls, 50),
         recall_p95=percentile(recalls, 95),
+        diag_avg_distance_computations=diag.distance_computations,
+        diag_avg_visited_nodes=diag.visited_nodes,
+        diag_avg_graph_hops=diag.graph_hops,
+        diag_avg_layers_traversed=diag.layers_traversed,
+        diag_avg_clusters_scanned=diag.clusters_scanned,
+        diag_avg_vectors_scanned=diag.vectors_scanned,
     )
     return benchmark_row
 
@@ -408,7 +434,7 @@ def run_flat_nsw_benchmark(
     build_time_sec = 0.0
     for query_vector in query_vectors[: min(5, len(query_vectors))]:
         store.search(query_vector=query_vector, top_k=top_k)
-    latencies_ms, recalls = evaluate_store(
+    latencies_ms, recalls, diag = evaluate_store(
         store=store,
         query_vectors=query_vectors,
         exact_result_ids_by_query=exact_result_ids_by_query,
@@ -434,6 +460,12 @@ def run_flat_nsw_benchmark(
         recall_avg=mean(recalls),
         recall_p50=percentile(recalls, 50),
         recall_p95=percentile(recalls, 95),
+        diag_avg_distance_computations=diag.distance_computations,
+        diag_avg_visited_nodes=diag.visited_nodes,
+        diag_avg_graph_hops=diag.graph_hops,
+        diag_avg_layers_traversed=diag.layers_traversed,
+        diag_avg_clusters_scanned=diag.clusters_scanned,
+        diag_avg_vectors_scanned=diag.vectors_scanned,
     )
     return flat_nsw_benchmark_row
 
@@ -467,7 +499,7 @@ def run_hnsw_benchmark(
     for query_vector in query_vectors[: min(5, len(query_vectors))]:
         store.search(query_vector=query_vector, top_k=top_k)
 
-    latencies_ms, recalls = evaluate_store(
+    latencies_ms, recalls, diag = evaluate_store(
         store=store,
         query_vectors=query_vectors,
         exact_result_ids_by_query=exact_result_ids_by_query,
@@ -496,6 +528,12 @@ def run_hnsw_benchmark(
         recall_avg=mean(recalls),
         recall_p50=percentile(recalls, 50),
         recall_p95=percentile(recalls, 95),
+        diag_avg_distance_computations=diag.distance_computations,
+        diag_avg_visited_nodes=diag.visited_nodes,
+        diag_avg_graph_hops=diag.graph_hops,
+        diag_avg_layers_traversed=diag.layers_traversed,
+        diag_avg_clusters_scanned=diag.clusters_scanned,
+        diag_avg_vectors_scanned=diag.vectors_scanned,
     )
 
 if __name__ == "__main__":

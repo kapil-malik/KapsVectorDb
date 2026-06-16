@@ -4,7 +4,7 @@ import heapq
 
 import numpy as np
 
-from vectordb.models import SearchResult, VectorRecord
+from vectordb.models import SearchDiagnostics, SearchResult, VectorRecord
 from vectordb.filters import metadata_matches
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from sklearn.cluster import MiniBatchKMeans
@@ -102,6 +102,15 @@ class IVFVectorStore(BufferedMatrixInMemVectorStore):
             top_k: int = 5,
             filters: dict[str, Any] | None = None
         ) -> list[SearchResult]:
+        results, _ = self.search_with_diagnostics(query_vector, top_k, filters)
+        return results
+
+    def search_with_diagnostics(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None,
+    ) -> tuple[list[SearchResult], SearchDiagnostics]:
         if not self._index_built:
             raise ValueError("IVF index has not been built. Call build() first.")
 
@@ -125,8 +134,14 @@ class IVFVectorStore(BufferedMatrixInMemVectorStore):
         for centroid_id in centroid_indices:
             candidate_indices.extend(self._lists[int(centroid_id)])
 
+        diag = SearchDiagnostics(
+            clusters_scanned=probe_count,
+            vectors_scanned=len(candidate_indices),
+            distance_computations=len(centroid_scores) + len(candidate_indices),
+        )
+
         if not candidate_indices:
-            return []
+            return [], diag
 
         candidate_matrix = self._vectors[candidate_indices]
         candidate_scores = candidate_matrix @ normalized_query
@@ -162,4 +177,4 @@ class IVFVectorStore(BufferedMatrixInMemVectorStore):
                 score=score,
             )
             for score, record_id in top_candidates
-        ]
+        ], diag

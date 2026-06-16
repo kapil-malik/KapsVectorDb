@@ -171,6 +171,8 @@ A benchmark was run to compare exact search, IVF, Flat NSW, and HNSW on a real P
 > **Note:**
 > This is still a relatively small ANN benchmark corpus (~881 vectors).
 > Exact search is already sub-millisecond at this scale, so ANN structures like HNSW do not yet fully demonstrate their large-scale advantages. The primary goal of this benchmark is learning ANN behavior and recall/latency tradeoffs, not production-scale performance claims.
+>
+> **HNSW recall note:** HNSW results can vary between runs due to random level assignment during graph construction. The random max-level of inserted nodes affects both the graph topology and the number of layers traversed at search time. Results below are from a single representative run.
 
 ### Benchmark Setup
 
@@ -178,7 +180,7 @@ A benchmark was run to compare exact search, IVF, Flat NSW, and HNSW on a real P
 poetry run python benchmarks/benchmark_pdf_ann_stores.py \
   --pdf The_DynamoDb_Book.pdf \
   --queries-file ./benchmarks/data/pdf_queries.txt \
-  --output-csv ./benchmarks/results/pdf_ann_results_2.csv \
+  --output-csv ./benchmarks/results/pdf_ann_results_3.csv \
   --top-k 5 \
   --ivf-nlist 10,20,40 \
   --ivf-nprobe 1,5,10 \
@@ -207,42 +209,111 @@ Stores compared:
 
 ### Results
 
-| Store    | Parameters                                | Prepare Time | p95 Search Latency | Avg Recall@5 |
-| -------- | ----------------------------------------- | -----------: | -----------------: | -----------: |
-| Exact    | `{}`                                      |    0.003 sec |           0.431 ms |        1.000 |
-| IVF      | `nlist=10, nprobe=1`                      |    0.136 sec |           0.060 ms |        0.676 |
-| IVF      | `nlist=10, nprobe=5`                      |    0.029 sec |           0.139 ms |        0.996 |
-| IVF      | `nlist=10, nprobe=10`                     |    0.033 sec |           0.127 ms |        1.000 |
-| IVF      | `nlist=20, nprobe=1`                      |    0.031 sec |           0.047 ms |        0.524 |
-| IVF      | `nlist=20, nprobe=5`                      |    0.032 sec |           0.091 ms |        0.940 |
-| IVF      | `nlist=20, nprobe=10`                     |    0.031 sec |           0.131 ms |        0.992 |
-| IVF      | `nlist=40, nprobe=1`                      |    0.068 sec |           0.037 ms |        0.528 |
-| IVF      | `nlist=40, nprobe=5`                      |    0.066 sec |           0.075 ms |        0.908 |
-| IVF      | `nlist=40, nprobe=10`                     |    0.067 sec |           0.090 ms |        0.972 |
-| Flat NSW | `m=8, ef_search=16`                       |    0.306 sec |           0.096 ms |        0.624 |
-| Flat NSW | `m=8, ef_search=32`                       |    0.293 sec |           0.156 ms |        0.784 |
-| Flat NSW | `m=8, ef_search=64`                       |    0.294 sec |           0.262 ms |        0.892 |
-| Flat NSW | `m=16, ef_search=16`                      |    0.460 sec |           0.140 ms |        0.888 |
-| Flat NSW | `m=16, ef_search=32`                      |    0.437 sec |           0.219 ms |        0.952 |
-| Flat NSW | `m=16, ef_search=64`                      |    0.441 sec |           0.335 ms |        0.996 |
-| HNSW     | `m=8, ef_construction=32, ef_search=16`   |    0.418 sec |           0.171 ms |        0.700 |
-| HNSW     | `m=8, ef_construction=32, ef_search=32`   |    0.418 sec |           0.245 ms |        0.836 |
-| HNSW     | `m=8, ef_construction=32, ef_search=64`   |    0.420 sec |           0.388 ms |        0.944 |
-| HNSW     | `m=8, ef_construction=64, ef_search=16`   |    0.488 sec |           0.173 ms |        0.724 |
-| HNSW     | `m=8, ef_construction=64, ef_search=32`   |    0.487 sec |           0.253 ms |        0.852 |
-| HNSW     | `m=8, ef_construction=64, ef_search=64`   |    0.491 sec |           0.397 ms |        0.948 |
-| HNSW     | `m=8, ef_construction=128, ef_search=16`  |    0.633 sec |           0.177 ms |        0.728 |
-| HNSW     | `m=8, ef_construction=128, ef_search=32`  |    0.631 sec |           0.256 ms |        0.860 |
-| HNSW     | `m=8, ef_construction=128, ef_search=64`  |    0.636 sec |           0.401 ms |        0.952 |
-| HNSW     | `m=16, ef_construction=32, ef_search=16`  |    0.611 sec |           0.228 ms |        0.904 |
-| HNSW     | `m=16, ef_construction=32, ef_search=32`  |    0.609 sec |           0.316 ms |        0.960 |
-| HNSW     | `m=16, ef_construction=32, ef_search=64`  |    0.614 sec |           0.474 ms |        0.988 |
-| HNSW     | `m=16, ef_construction=64, ef_search=16`  |    0.772 sec |           0.233 ms |        0.916 |
-| HNSW     | `m=16, ef_construction=64, ef_search=32`  |    0.768 sec |           0.323 ms |        0.976 |
-| HNSW     | `m=16, ef_construction=64, ef_search=64`  |    0.775 sec |           0.481 ms |        0.992 |
-| HNSW     | `m=16, ef_construction=128, ef_search=16` |    1.054 sec |           0.236 ms |        0.920 |
-| HNSW     | `m=16, ef_construction=128, ef_search=32` |    1.047 sec |           0.327 ms |        0.984 |
-| HNSW     | `m=16, ef_construction=128, ef_search=64` |    1.058 sec |           0.486 ms |        0.992 |
+| Store    | Parameters                                  | Prepare Time | p95 Search Latency | Avg Recall@5 |
+| -------- | ------------------------------------------- | -----------: | -----------------: | -----------: |
+| Exact    | `{}`                                        |    0.003 sec |           0.374 ms |        1.000 |
+| IVF      | `nlist=10, nprobe=1`                        |    0.143 sec |           0.065 ms |        0.676 |
+| IVF      | `nlist=10, nprobe=5`                        |    0.026 sec |           0.151 ms |        0.996 |
+| IVF      | `nlist=10, nprobe=10`                       |    0.024 sec |           0.128 ms |        1.000 |
+| IVF      | `nlist=20, nprobe=1`                        |    0.036 sec |           0.066 ms |        0.524 |
+| IVF      | `nlist=20, nprobe=5`                        |    0.119 sec |           0.121 ms |        0.940 |
+| IVF      | `nlist=20, nprobe=10`                       |    0.033 sec |           0.142 ms |        0.992 |
+| IVF      | `nlist=40, nprobe=1`                        |    0.064 sec |           0.039 ms |        0.528 |
+| IVF      | `nlist=40, nprobe=5`                        |    0.061 sec |           0.065 ms |        0.908 |
+| IVF      | `nlist=40, nprobe=10`                       |    0.063 sec |           0.074 ms |        0.972 |
+| Flat NSW | `m=8, ef_search=16`                         |    0.314 sec |           0.116 ms |        0.624 |
+| Flat NSW | `m=8, ef_search=32`                         |    0.308 sec |           0.212 ms |        0.784 |
+| Flat NSW | `m=8, ef_search=64`                         |    0.304 sec |           0.296 ms |        0.892 |
+| Flat NSW | `m=16, ef_search=16`                        |    0.455 sec |           0.183 ms |        0.868 |
+| Flat NSW | `m=16, ef_search=32`                        |    0.455 sec |           0.293 ms |        0.952 |
+| Flat NSW | `m=16, ef_search=64`                        |    0.458 sec |           0.446 ms |        0.996 |
+| HNSW     | `m=8, ef_construction=32, ef_search=16`     |    0.245 sec |           0.148 ms |        0.656 |
+| HNSW     | `m=8, ef_construction=32, ef_search=32`     |    0.246 sec |           0.224 ms |        0.712 |
+| HNSW     | `m=8, ef_construction=32, ef_search=64`     |    0.241 sec |           0.341 ms |        0.820 |
+| HNSW     | `m=8, ef_construction=64, ef_search=16`     |    0.310 sec |           0.147 ms |        0.696 |
+| HNSW     | `m=8, ef_construction=64, ef_search=32`     |    0.307 sec |           0.236 ms |        0.836 |
+| HNSW     | `m=8, ef_construction=64, ef_search=64`     |    0.330 sec |           0.328 ms |        0.912 |
+| HNSW     | `m=8, ef_construction=128, ef_search=16`    |    0.451 sec |           0.177 ms |        0.728 |
+| HNSW     | `m=8, ef_construction=128, ef_search=32`    |    0.440 sec |           0.217 ms |        0.880 |
+| HNSW     | `m=8, ef_construction=128, ef_search=64`    |    0.459 sec |           0.350 ms |        0.892 |
+| HNSW     | `m=16, ef_construction=32, ef_search=16`    |    0.561 sec |           0.287 ms |        0.896 |
+| HNSW     | `m=16, ef_construction=32, ef_search=32`    |    0.575 sec |           0.362 ms |        0.952 |
+| HNSW     | `m=16, ef_construction=32, ef_search=64`    |    0.551 sec |           0.561 ms |        0.984 |
+| HNSW     | `m=16, ef_construction=64, ef_search=16`    |    0.687 sec |           0.250 ms |        0.884 |
+| HNSW     | `m=16, ef_construction=64, ef_search=32`    |    0.660 sec |           0.372 ms |        0.980 |
+| HNSW     | `m=16, ef_construction=64, ef_search=64`    |    0.648 sec |           0.573 ms |        0.992 |
+| HNSW     | `m=16, ef_construction=128, ef_search=16`   |    0.804 sec |           0.264 ms |        0.888 |
+| HNSW     | `m=16, ef_construction=128, ef_search=32`   |    0.775 sec |           0.388 ms |        0.984 |
+| HNSW     | `m=16, ef_construction=128, ef_search=64`   |    0.824 sec |           0.506 ms |        0.996 |
+
+### Search Diagnostics
+
+Each ANN search now emits a `SearchDiagnostics` object counting the work done per query. The tables below show averages across 50 queries.
+
+#### IVF: Partition Cost is `nlist + vectors_scanned`
+
+| Parameters             | Clusters Scanned | Vectors Scanned | Distance Computations | Avg Recall@5 |
+| ---------------------- | ---------------: | --------------: | --------------------: | -----------: |
+| `nlist=10, nprobe=1`   |                1 |             144 |                   154 |        0.676 |
+| `nlist=10, nprobe=5`   |                5 |             554 |                   564 |        0.996 |
+| `nlist=10, nprobe=10`  |               10 |             881 |                   891 |        1.000 |
+| `nlist=20, nprobe=1`   |                1 |              71 |                    91 |        0.524 |
+| `nlist=20, nprobe=5`   |                5 |             318 |                   338 |        0.940 |
+| `nlist=40, nprobe=1`   |                1 |              32 |                    72 |        0.528 |
+| `nlist=40, nprobe=5`   |                5 |             161 |                   201 |        0.908 |
+| `nlist=40, nprobe=10`  |               10 |             289 |                   329 |        0.972 |
+
+The formula `distance_computations = nlist + vectors_scanned` holds exactly. The `nlist` term is the fixed centroid-scoring cost (scores all cluster centers), while `vectors_scanned` is the variable candidate cost that grows with `nprobe`.
+
+`nlist=10, nprobe=10` degenerates to a full scan: all 10 clusters are probed, covering all 881 vectors, and recall reaches 1.0.
+
+With `nlist=40, nprobe=5` we scan only 18% of the corpus (161/881 vectors) and still achieve 0.908 recall — a direct result of the KMeans clustering putting related vectors near each other.
+
+#### Flat NSW: `visited_nodes` Always Equals `distance_computations`
+
+| Parameters            | Visited Nodes | Graph Hops | Distance Computations | Hop:Dist Ratio | Avg Recall@5 |
+| --------------------- | ------------: | ---------: | --------------------: | -------------: | -----------: |
+| `m=8, ef_search=16`   |            69 |        166 |                    69 |           2.4× |        0.624 |
+| `m=8, ef_search=32`   |           109 |        298 |                   109 |           2.7× |        0.784 |
+| `m=8, ef_search=64`   |           170 |        547 |                   170 |           3.2× |        0.892 |
+| `m=16, ef_search=16`  |           115 |        299 |                   115 |           2.6× |        0.868 |
+| `m=16, ef_search=32`  |           170 |        555 |                   170 |           3.3× |        0.952 |
+| `m=16, ef_search=64`  |           255 |       1058 |                   255 |           4.1× |        0.996 |
+
+`visited_nodes` equals `distance_computations` exactly for every configuration — a structural property of the implementation. Every node added to the visited set gets exactly one distance computation; there are no wasted computations from revisits.
+
+The **hop:dist ratio** (graph hops / distance computations) measures how many edge traversals don't produce a new distance computation because the neighbor was already visited. This ratio grows with both `m` and `ef_search`: denser graphs and larger candidate pools cause more of the graph to be covered, increasing the fraction of edges that hit already-visited nodes.
+
+Higher `m` gives better recall at the same `ef_search` (m=16 at ef_search=16 beats m=8 at ef_search=64 with 0.868 vs 0.892 — close — but at lower `dist_comp`: 115 vs 170) because denser initial connectivity provides better neighborhood coverage from fewer hops.
+
+#### HNSW: Greedy Upper Layers Add a Navigation Overhead
+
+| Parameters                             | Visited Nodes | Dist Comp | Nav Overhead | Layers | Avg Recall@5 |
+| -------------------------------------- | ------------: | --------: | -----------: | -----: | -----------: |
+| `m=8, ef_construction=64, ef_search=16`  |            63 |       125 |           62 |      7 |        0.696 |
+| `m=8, ef_construction=64, ef_search=32`  |           104 |       168 |           64 |      7 |        0.836 |
+| `m=8, ef_construction=64, ef_search=64`  |           168 |       234 |           66 |      8 |        0.912 |
+| `m=16, ef_construction=64, ef_search=16` |           106 |       216 |          110 |      7 |        0.884 |
+| `m=16, ef_construction=64, ef_search=32` |           167 |       282 |          115 |      7 |        0.980 |
+| `m=16, ef_construction=64, ef_search=64` |           255 |       366 |          111 |      6 |        0.992 |
+
+**Navigation overhead** = `distance_computations - visited_nodes`. This is the cost of greedy descent through upper layers — distance computations that happen during the layer-by-layer navigation to find a good entry point for the layer-0 ef_search, but which don't add to the `visited_nodes` count (which only tracks the layer-0 beam search).
+
+Key observation: for a given `m`, the navigation overhead stays nearly constant regardless of `ef_search` (m=8: ~62–66; m=16: ~110–115). This makes sense — `ef_search` only affects the layer-0 beam search, not the greedy upper-layer traversal. The navigation overhead is determined by `m` and the number of layers.
+
+`layers_traversed` (6–11) shows run-to-run variance because the max graph level is set by the highest randomly-assigned level among all 881 inserted nodes. With `level_multiplier=1.0`, this follows a geometric distribution, so the maximum varies between runs.
+
+#### HNSW vs Flat NSW at Comparable Recall
+
+At this corpus size (881 vectors), HNSW pays more distance computations than Flat NSW for equivalent recall:
+
+| Recall target | Flat NSW                        | Dist Comp | HNSW                                      | Dist Comp | HNSW overhead |
+| ------------- | ------------------------------- | --------: | ----------------------------------------- | --------: | ------------: |
+| ~0.996        | `m=16, ef_search=64`            |       255 | `m=16, ef_construction=128, ef_search=64` |       374 |          +47% |
+| ~0.980        | `m=16, ef_search=32` (0.952)    |       170 | `m=16, ef_construction=64, ef_search=32`  |       282 |          +66% |
+| ~0.890        | `m=8, ef_search=64`             |       170 | `m=8, ef_construction=64, ef_search=64`   |       234 |          +38% |
+
+The hierarchical navigation adds overhead (the ~60–115 extra distance computations per query) that is not offset by a better layer-0 entry point at this scale. With only 881 vectors, the random entry point in Flat NSW is already adequate for the beam search to converge. HNSW's advantage — reducing the search starting point to be close to the answer before the expensive beam search — only materialises at corpus sizes where a random entry point would lead to slow convergence.
 
 ### Key Learnings
 
@@ -268,18 +339,22 @@ higher ef_construction  -> better graph quality, slower inserts
 higher m                -> denser graph connectivity, higher recall
 ```
 
-The best IVF configurations achieved near-exact recall with much lower p95 latency than exact search.
+**Diagnostic learnings:**
 
-Flat NSW achieved near-exact recall using a single-layer graph traversal strategy.
+IVF's distance computation cost is exactly `nlist + vectors_scanned`. The `nlist` centroid-scoring is a fixed overhead; `vectors_scanned` is the variable cost controlled by `nprobe`. Setting `nprobe = nlist` degenerates to a full exact scan.
 
-HNSW achieved similarly high recall using hierarchical graph navigation, but with higher preparation cost because graph construction is more complex and multi-layered.
+In Flat NSW, `visited_nodes` always equals `distance_computations` — every unique node touch corresponds to exactly one distance computation. The graph hop:distance ratio (1.4×–4.1×) reflects wasted edge traversals to already-visited nodes, and grows with both `m` and `ef_search`.
 
-At this relatively small dataset size, IVF currently provides the best recall/latency tradeoff. HNSW is expected to become more advantageous at much larger corpus sizes where hierarchical navigation reduces search cost significantly.
+In HNSW, `distance_computations > visited_nodes` always. The gap is the **navigation overhead** from greedy upper-layer descent. This gap is approximately constant for a given `m` regardless of `ef_search`, because upper-layer traversal is controlled by `m` and the graph topology, not `ef_search`.
+
+At this corpus size (881 vectors), the navigation overhead is net-negative: HNSW uses 38–66% more distance computations than Flat NSW for equivalent recall. The hierarchy pays off only at scale, where a random entry point to a large graph would cost many more layer-0 beam search iterations to converge.
+
+`ef_construction` in HNSW does not measurably change search-time distance computations — it only affects graph quality (and therefore recall). The search traversal cost is determined by `ef_search` and `m` alone.
 
 This benchmark demonstrates three distinct ANN philosophies:
 
 ```text
-IVF       -> partition then scan
-Flat NSW  -> navigate then refine
-HNSW      -> hierarchical navigation then refine
+IVF       -> partition then scan (cost = nlist + cluster_vectors × nprobe)
+Flat NSW  -> navigate then refine (cost = visited_nodes, 1:1 with dist_comp)
+HNSW      -> hierarchical navigation then refine (cost = nav_overhead + layer_0_beam_cost)
 ```

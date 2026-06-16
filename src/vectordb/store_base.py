@@ -1,7 +1,7 @@
 from typing import Any, Protocol
 import numpy as np
 
-from vectordb.models import SearchResult, VectorRecord
+from vectordb.models import SearchDiagnostics, SearchResult, VectorRecord
 
 
 class VectorStore(Protocol):
@@ -22,4 +22,14 @@ class VectorStore(Protocol):
             query_vector: np.ndarray,
             top_k: int = 5,
             filters: dict[str, Any] | None = None) -> list[SearchResult]:
+        ...
+
+
+class ANNStore(VectorStore, Protocol):
+    def search_with_diagnostics(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None,
+    ) -> tuple[list[SearchResult], SearchDiagnostics]:
         ...

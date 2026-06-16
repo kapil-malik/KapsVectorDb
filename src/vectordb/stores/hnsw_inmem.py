@@ -8,7 +8,7 @@ import numpy as np
 
 from vectordb.distance import dot_similarity
 from vectordb.filters import metadata_matches
-from vectordb.models import SearchResult, VectorRecord
+from vectordb.models import SearchDiagnostics, SearchResult, VectorRecord
 
 
 class HNSWVectorStore:
@@ -144,8 +144,19 @@ class HNSWVectorStore:
             query_vector: np.ndarray,
             top_k: int = 5,
             filters: dict[str, Any] | None = None) -> list[SearchResult]:
+        results, _ = self.search_with_diagnostics(query_vector, top_k, filters)
+        return results
+
+    def search_with_diagnostics(
+            self,
+            query_vector: np.ndarray,
+            top_k: int = 5,
+            filters: dict[str, Any] | None = None,
+    ) -> tuple[list[SearchResult], SearchDiagnostics]:
+        diag = SearchDiagnostics()
+
         if self._entry_point_id is None:
-            return []
+            return [], diag
 
         if top_k <= 0:
             raise ValueError("top_k must be positive")
@@ -166,7 +177,7 @@ class HNSWVectorStore:
 
         # 1. Greedy descent from top layer to layer 1.
         for level in range(self._max_level, 0, -1):
-            current_entry = self._greedy_search_layer(normalized_query_vector, current_entry, level)
+            current_entry = self._greedy_search_layer(normalized_query_vector, current_entry, level, diag)
 
         # 2. Wider ef_search at layer 0.
         best_candidates = self._search_layer(
@@ -174,9 +185,12 @@ class HNSWVectorStore:
             entry_id=current_entry,
             level=0,
             ef=self.ef_search,
+            diag=diag,
         )
 
-        best_candidates.sort(key=lambda x: x[0], reverse=True)  # Sort by score descending
+        diag.layers_traversed = self._max_level + 1
+
+        best_candidates.sort(key=lambda x: x[0], reverse=True)
 
         results: list[SearchResult] = []
 
@@ -196,7 +210,7 @@ class HNSWVectorStore:
             if len(results) >= top_k:
                 break
 
-        return results
+        return results, diag
 
 
     # HNSW uses a random level generator based on a geometric distribution.
@@ -211,19 +225,23 @@ class HNSWVectorStore:
             query_vector: np.ndarray,
             entry_id: str,
             level: int,
+            diag: SearchDiagnostics | None = None,
         ) -> str:
         current_id = entry_id
         current_score = dot_similarity(query_vector, self._vectors[current_id])
+        if diag: diag.distance_computations += 1
 
         improved = True
 
         while improved:
             improved = False
             for neighbor_id in self._neighbors[level][current_id]:
+                if diag: diag.graph_hops += 1
                 if neighbor_id in self._tombstone_ids:
                     continue
 
                 neighbor_score = dot_similarity(query_vector, self._vectors[neighbor_id])
+                if diag: diag.distance_computations += 1
                 if neighbor_score > current_score:
                     current_id = neighbor_id
                     current_score = neighbor_score
@@ -239,6 +257,7 @@ class HNSWVectorStore:
             entry_id: str,
             level: int,
             ef: int,
+            diag: SearchDiagnostics | None = None,
     ) -> list[tuple[float, str]]:
         visited: set[str] = set()
 
@@ -250,10 +269,12 @@ class HNSWVectorStore:
         best_results: list[tuple[float, str]] = []
 
         entry_score = dot_similarity(query_vector, self._vectors[entry_id])
+        if diag: diag.distance_computations += 1
 
         heapq.heappush(candidates, (-entry_score, entry_id))
         heapq.heappush(best_results, (entry_score, entry_id))
         visited.add(entry_id)
+        if diag: diag.visited_nodes += 1
 
         while candidates:
             current_neg_score, current_id = heapq.heappop(candidates)
@@ -265,12 +286,15 @@ class HNSWVectorStore:
                 break
 
             for neighbor_id in self._neighbors[level].get(current_id, set()):
+                if diag: diag.graph_hops += 1
                 if neighbor_id in visited or neighbor_id in self._tombstone_ids:
                     continue
 
                 visited.add(neighbor_id)
+                if diag: diag.visited_nodes += 1
 
                 neighbor_score = dot_similarity(query_vector, self._vectors[neighbor_id])
+                if diag: diag.distance_computations += 1
 
                 if len(best_results) < ef or neighbor_score > worst_best_score:
                     heapq.heappush(candidates, (-neighbor_score, neighbor_id))

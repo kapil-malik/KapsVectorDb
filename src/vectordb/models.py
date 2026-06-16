@@ -53,3 +53,13 @@ class VectorRecord:
 class SearchResult:
     record: VectorRecord
     score: float
+
+
+@dataclass
+class SearchDiagnostics:
+    distance_computations: int = 0  # dot_similarity calls — universal cost proxy
+    visited_nodes: int = 0          # unique nodes added to visited set (graph stores)
+    graph_hops: int = 0             # total neighbor-list iterations (graph stores)
+    layers_traversed: int = 0       # layers descended through (HNSW: max_level+1, NSW: 1)
+    clusters_scanned: int = 0       # nprobe clusters probed (IVF only)
+    vectors_scanned: int = 0        # candidate vectors in selected clusters (IVF only)
