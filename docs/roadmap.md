@@ -145,7 +145,7 @@ Understand how modern vector databases scale similarity search using partition-b
 - Layer-by-layer greedy descent
 - Bottom-layer ef_search refinement
 
-#### M4.4 — ANN Instrumentation & Diagnostics ⏳
+#### M4.4 — ANN Instrumentation & Diagnostics ✅
 - Track visited nodes
 - Track candidate expansions
 - Track vectors scanned

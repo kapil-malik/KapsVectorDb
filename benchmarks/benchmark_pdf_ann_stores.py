@@ -188,7 +188,7 @@ def params_to_json(params: dict[str, Any]) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Benchmark exact, IVF, and Flat NSW stores on a real PDF corpus"
+        description="Benchmark exact, IVF, Flat NSW, and HNSW stores on a real PDF corpus"
     )
 
     parser.add_argument("--pdf", required=True)

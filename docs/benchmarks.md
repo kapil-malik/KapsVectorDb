@@ -248,6 +248,8 @@ Stores compared:
 
 ### Search Diagnostics
 
+The diagnostic counters are implementation-specific learning metrics rather than standardized ANN benchmark metrics. They are intended to help visualize and compare the internal work performed by different ANN algorithms on the same query workload.
+
 Each ANN search now emits a `SearchDiagnostics` object counting the work done per query. The tables below show averages across 50 queries.
 
 #### IVF: Partition Cost is `nlist + vectors_scanned`
@@ -284,7 +286,7 @@ With `nlist=40, nprobe=5` we scan only 18% of the corpus (161/881 vectors) and s
 
 The **hop:dist ratio** (graph hops / distance computations) measures how many edge traversals don't produce a new distance computation because the neighbor was already visited. This ratio grows with both `m` and `ef_search`: denser graphs and larger candidate pools cause more of the graph to be covered, increasing the fraction of edges that hit already-visited nodes.
 
-Higher `m` gives better recall at the same `ef_search` (m=16 at ef_search=16 beats m=8 at ef_search=64 with 0.868 vs 0.892 — close — but at lower `dist_comp`: 115 vs 170) because denser initial connectivity provides better neighborhood coverage from fewer hops.
+Higher `m` improves graph quality and recall efficiency. For example, m=16 at ef_search=16 achieves 0.868 recall using only 115 distance computations, while m=8 requires ef_search=64 and 170 distance computations to reach a similar recall band (0.892).
 
 #### HNSW: Greedy Upper Layers Add a Navigation Overhead
 
@@ -305,7 +307,7 @@ Key observation: for a given `m`, the navigation overhead stays nearly constant 
 
 #### HNSW vs Flat NSW at Comparable Recall
 
-At this corpus size (881 vectors), HNSW pays more distance computations than Flat NSW for equivalent recall:
+At this corpus size (881 vectors), HNSW pays more distance computations than Flat NSW for roughly comparable recall bands:
 
 | Recall target | Flat NSW                        | Dist Comp | HNSW                                      | Dist Comp | HNSW overhead |
 | ------------- | ------------------------------- | --------: | ----------------------------------------- | --------: | ------------: |
@@ -343,13 +345,13 @@ higher m                -> denser graph connectivity, higher recall
 
 IVF's distance computation cost is exactly `nlist + vectors_scanned`. The `nlist` centroid-scoring is a fixed overhead; `vectors_scanned` is the variable cost controlled by `nprobe`. Setting `nprobe = nlist` degenerates to a full exact scan.
 
-In Flat NSW, `visited_nodes` always equals `distance_computations` — every unique node touch corresponds to exactly one distance computation. The graph hop:distance ratio (1.4×–4.1×) reflects wasted edge traversals to already-visited nodes, and grows with both `m` and `ef_search`.
+In Flat NSW, `visited_nodes` always equals `distance_computations` — every unique node touch corresponds to exactly one distance computation. The graph hop:distance ratio (2.4×–4.1×) reflects wasted edge traversals to already-visited nodes, and grows with both `m` and `ef_search`.
 
 In HNSW, `distance_computations > visited_nodes` always. The gap is the **navigation overhead** from greedy upper-layer descent. This gap is approximately constant for a given `m` regardless of `ef_search`, because upper-layer traversal is controlled by `m` and the graph topology, not `ef_search`.
 
-At this corpus size (881 vectors), the navigation overhead is net-negative: HNSW uses 38–66% more distance computations than Flat NSW for equivalent recall. The hierarchy pays off only at scale, where a random entry point to a large graph would cost many more layer-0 beam search iterations to converge.
+At this corpus size (881 vectors), the navigation overhead is net-negative: HNSW uses 38–66% more distance computations than Flat NSW for roughly comparable recall bands. The hierarchy pays off only at scale, where a random entry point to a large graph would cost many more layer-0 beam search iterations to converge.
 
-`ef_construction` in HNSW does not measurably change search-time distance computations — it only affects graph quality (and therefore recall). The search traversal cost is determined by `ef_search` and `m` alone.
+In this benchmark, `ef_construction` primarily affects graph quality and recall. Search-time distance computations are affected much more strongly by `m` and `ef_search`. Changes to `ef_construction` may still indirectly influence traversal efficiency through changes in graph topology.
 
 This benchmark demonstrates three distinct ANN philosophies:
 
