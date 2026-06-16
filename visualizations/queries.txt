@@ -1,0 +1,5 @@
+what is a partition key and how does DynamoDB use it?
+how does DynamoDB handle hot partitions?
+what are the differences between GSI and LSI?
+how does DynamoDB pricing work?
+what is the DynamoDB single table design pattern?
