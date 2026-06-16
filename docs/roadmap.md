@@ -153,11 +153,11 @@ Understand how modern vector databases scale similarity search using partition-b
 - Track IVF clusters scanned
 - Compare recall vs actual work done
 
-#### M4.5 — ANN Visualization ⏳
-- Small-dataset graph visualization
-- NSW/HNSW traversal path visualization
-- IVF cluster visualization
-- Recall/latency/work curves
+#### M4.5 — ANN Visualization ✅
+- Recall/latency/work curves (`visualize_ann_benchmark_results.py`)
+- IVF cluster visualization (`visualize_ivf_clusters.py`)
+- NSW/HNSW traversal path visualization (`visualize_graph_traversal.py`)
+- Small-dataset graph visualization (via `--max-chunks` flag)
 
 ---
 

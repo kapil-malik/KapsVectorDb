@@ -132,7 +132,7 @@ Benefits:
 Tradeoff:
 - Search latency may increase due to disk page faults and I/O.
 
-### 7. `IVFInMemVectorStore`
+### 7. `IVFVectorStore`
 
 In-memory IVF (Inverted File Index) vector store.
 
@@ -227,7 +227,7 @@ Tradeoff:
 | `NormalizedInMemVectorStore` | O(D) (normalization) | O(N × D) (dot product) | No | O(N) memory |
 | `MatrixBackedInMemVectorStore` | O(N × D) (matrix operations) | O(N × D) (vectorized operations) | No | O(N) memory | 
 | `BufferedMatrixInMemVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized operations) | No | O(N) memory |
-| `BufferedMatrixFileVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized operations) | Yes | Disk-backed |
+| `FileBackedVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized operations) | Yes | Disk-backed |
 | `MMapVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized mmap search) | Yes | Larger-than-memory datasets |
 | `IVFVectorStore` | O(B × D) + build step | O((N / nlist) × nprobe × D) approximate search | No | ANN search with clustering |
 | `FlatNSWVectorStore` | O(N × D) (graph neighbor discovery) | Approximate graph traversal | No | ANN search with graph index |

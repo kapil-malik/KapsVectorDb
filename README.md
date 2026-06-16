@@ -5,11 +5,13 @@ A fresh attempt at vector database design. This project implements an in-memory 
 ## Project Structure
 
 The main source code is in `src/vectordb/`:
-- `stores/`: Multiple in-memory vector store implementations (Naive, Normalized, Matrix-backed, Buffered).
+- `stores/`: Nine vector store implementations — exact-search (Naive, Normalized, Matrix-backed, Buffered), persistent (FileBacked, MMap), and ANN (IVF, FlatNSW, HNSW).
 - `embeddings/`: Embedding models (SentenceTransformer support).
 - `ingestion/`: Text chunking and PDF loading utilities (chunkers, PDF loader).
 - `retrieval/`: Semantic text retrieval using embeddings.
-- `models.py`: Core data structures (`VectorRecord`, `SearchResult`).
+- `models.py`: Core data structures (`VectorRecord`, `SearchResult`, `SearchDiagnostics`).
+
+Benchmarks live in `benchmarks/` and visualization scripts in `visualizations/`.
 
 ## Quick Start
 
@@ -89,9 +91,9 @@ What it does:
 
 - Phase 1 — Exact-search vector store internals ✅
 - Phase 2 — Semantic retrieval / RAG layer ✅
-- Phase 3 — Persistence and metadata filtering 🚧
-- Phase 4 — Approximate nearest neighbor indexes (IVF / HNSW)
-- Phase 5 — Retrieval quality evaluation
+- Phase 3 — Persistence and metadata filtering ✅
+- Phase 4 — Approximate nearest neighbor indexes (IVF / HNSW) ✅
+- Phase 5 — Retrieval quality evaluation ⏳
 
 See [docs/roadmap.md](docs/roadmap.md) for the full milestone breakdown.
 
@@ -125,7 +127,8 @@ Notes and Tips
 - `numpy`
 - `sentence-transformers` (for embeddings)
 - `pypdf` (for PDF ingestion)
-- Dev: `pytest`, `black`, `isort`, `mypy`, `tqdm`
+- `scikit-learn` (for PCA in visualizations)
+- Dev: `pytest`, `black`, `isort`, `mypy`, `tqdm`, `matplotlib`, `pandas`
 
 ## Documentation
 
