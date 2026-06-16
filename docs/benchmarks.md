@@ -1,6 +1,7 @@
 ## Benchmarking
 
-The project includes benchmark scripts to compare vector store implementations and semantic retrieval performance.
+The project includes benchmark scripts to compare vector store implementations
+and semantic retrieval performance.
 
 ### 1. `benchmark_store.py`
 
@@ -89,7 +90,8 @@ Key learnings:
 
 ## Tombstones and Compaction Benchmark
 
-A benchmark was run to understand the impact of tombstones and compaction on search performance.
+A benchmark was run to understand the impact of tombstones and compaction on search
+performance.
 
 ### Benchmark Setup
 
@@ -154,7 +156,8 @@ Delete reduces logical records.
 Compaction reduces physical records.
 ```
 
-The benchmark also confirms that exact vector search scales approximately linearly with the number of stored vectors:
+The benchmark also confirms that exact vector search scales approximately linearly
+with the number of stored vectors:
 
 ```text
 O(N × D)
@@ -166,13 +169,20 @@ Where:
 
 ## PDF ANN Store Benchmark
 
-A benchmark was run to compare exact search, IVF, Flat NSW, and HNSW on a real PDF-based retrieval workload.
+A benchmark was run to compare exact search, IVF, Flat NSW, and HNSW on a real
+PDF-based retrieval workload.
 
 > **Note:**
 > This is still a relatively small ANN benchmark corpus (~881 vectors).
-> Exact search is already sub-millisecond at this scale, so ANN structures like HNSW do not yet fully demonstrate their large-scale advantages. The primary goal of this benchmark is learning ANN behavior and recall/latency tradeoffs, not production-scale performance claims.
+> Exact search is already sub-millisecond at this scale, so ANN structures like HNSW
+> do not yet fully demonstrate their large-scale advantages. The primary goal of this
+> benchmark is learning ANN behavior and recall/latency tradeoffs, not
+> production-scale performance claims.
 >
-> **HNSW recall note:** HNSW results can vary between runs due to random level assignment during graph construction. The random max-level of inserted nodes affects both the graph topology and the number of layers traversed at search time. Results below are from a single representative run.
+> **HNSW recall note:** HNSW results can vary between runs due to random level
+> assignment during graph construction. The random max-level of inserted nodes affects
+> both the graph topology and the number of layers traversed at search time. Results
+> below are from a single representative run.
 
 ### Benchmark Setup
 
@@ -248,9 +258,12 @@ Stores compared:
 
 ### Search Diagnostics
 
-The diagnostic counters are implementation-specific learning metrics rather than standardized ANN benchmark metrics. They are intended to help visualize and compare the internal work performed by different ANN algorithms on the same query workload.
+The diagnostic counters are implementation-specific learning metrics rather than
+standardized ANN benchmark metrics. They are intended to help visualize and compare
+the internal work performed by different ANN algorithms on the same query workload.
 
-Each ANN search now emits a `SearchDiagnostics` object counting the work done per query. The tables below show averages across 50 queries.
+Each ANN search now emits a `SearchDiagnostics` object counting the work done per
+query. The tables below show averages across 50 queries.
 
 #### IVF: Partition Cost is `nlist + vectors_scanned`
 
@@ -265,11 +278,16 @@ Each ANN search now emits a `SearchDiagnostics` object counting the work done pe
 | `nlist=40, nprobe=5`   |                5 |             161 |                   201 |        0.908 |
 | `nlist=40, nprobe=10`  |               10 |             289 |                   329 |        0.972 |
 
-The formula `distance_computations = nlist + vectors_scanned` holds exactly. The `nlist` term is the fixed centroid-scoring cost (scores all cluster centers), while `vectors_scanned` is the variable candidate cost that grows with `nprobe`.
+The formula `distance_computations = nlist + vectors_scanned` holds exactly. The
+`nlist` term is the fixed centroid-scoring cost (scores all cluster centers), while
+`vectors_scanned` is the variable candidate cost that grows with `nprobe`.
 
-`nlist=10, nprobe=10` degenerates to a full scan: all 10 clusters are probed, covering all 881 vectors, and recall reaches 1.0.
+`nlist=10, nprobe=10` degenerates to a full scan: all 10 clusters are probed,
+covering all 881 vectors, and recall reaches 1.0.
 
-With `nlist=40, nprobe=5` we scan only 18% of the corpus (161/881 vectors) and still achieve 0.908 recall — a direct result of the KMeans clustering putting related vectors near each other.
+With `nlist=40, nprobe=5` we scan only 18% of the corpus (161/881 vectors) and still
+achieve 0.908 recall — a direct result of the KMeans clustering putting related
+vectors near each other.
 
 #### Flat NSW: `visited_nodes` Always Equals `distance_computations`
 
@@ -282,11 +300,20 @@ With `nlist=40, nprobe=5` we scan only 18% of the corpus (161/881 vectors) and s
 | `m=16, ef_search=32`  |           170 |        555 |                   170 |           3.3× |        0.952 |
 | `m=16, ef_search=64`  |           255 |       1058 |                   255 |           4.1× |        0.996 |
 
-`visited_nodes` equals `distance_computations` exactly for every configuration — a structural property of the implementation. Every node added to the visited set gets exactly one distance computation; there are no wasted computations from revisits.
+`visited_nodes` equals `distance_computations` exactly for every configuration — a
+structural property of the implementation. Every node added to the visited set gets
+exactly one distance computation; there are no wasted computations from revisits.
 
-The **hop:dist ratio** (graph hops / distance computations) measures how many edge traversals don't produce a new distance computation because the neighbor was already visited. This ratio grows with both `m` and `ef_search`: denser graphs and larger candidate pools cause more of the graph to be covered, increasing the fraction of edges that hit already-visited nodes.
+The **hop:dist ratio** (graph hops / distance computations) measures how many edge
+traversals don't produce a new distance computation because the neighbor was already
+visited. This ratio grows with both `m` and `ef_search`: denser graphs and larger
+candidate pools cause more of the graph to be covered, increasing the fraction of
+edges that hit already-visited nodes.
 
-Higher `m` improves graph quality and recall efficiency. For example, m=16 at ef_search=16 achieves 0.868 recall using only 115 distance computations, while m=8 requires ef_search=64 and 170 distance computations to reach a similar recall band (0.892).
+Higher `m` improves graph quality and recall efficiency. For example, m=16 at
+ef_search=16 achieves 0.868 recall using only 115 distance computations, while m=8
+requires ef_search=64 and 170 distance computations to reach a similar recall band
+(0.892).
 
 #### HNSW: Greedy Upper Layers Add a Navigation Overhead
 
@@ -299,15 +326,26 @@ Higher `m` improves graph quality and recall efficiency. For example, m=16 at ef
 | `m=16, ef_construction=64, ef_search=32` |           167 |       282 |          115 |      7 |        0.980 |
 | `m=16, ef_construction=64, ef_search=64` |           255 |       366 |          111 |      6 |        0.992 |
 
-**Navigation overhead** = `distance_computations - visited_nodes`. This is the cost of greedy descent through upper layers — distance computations that happen during the layer-by-layer navigation to find a good entry point for the layer-0 ef_search, but which don't add to the `visited_nodes` count (which only tracks the layer-0 beam search).
+**Navigation overhead** = `distance_computations - visited_nodes`. This is the cost
+of greedy descent through upper layers — distance computations that happen during the
+layer-by-layer navigation to find a good entry point for the layer-0 ef_search, but
+which don't add to the `visited_nodes` count (which only tracks the layer-0 beam
+search).
 
-Key observation: for a given `m`, the navigation overhead stays nearly constant regardless of `ef_search` (m=8: ~62–66; m=16: ~110–115). This makes sense — `ef_search` only affects the layer-0 beam search, not the greedy upper-layer traversal. The navigation overhead is determined by `m` and the number of layers.
+Key observation: for a given `m`, the navigation overhead stays nearly constant
+regardless of `ef_search` (m=8: ~62–66; m=16: ~110–115). This makes sense —
+`ef_search` only affects the layer-0 beam search, not the greedy upper-layer
+traversal. The navigation overhead is determined by `m` and the number of layers.
 
-`layers_traversed` (6–11) shows run-to-run variance because the max graph level is set by the highest randomly-assigned level among all 881 inserted nodes. With `level_multiplier=1.0`, this follows a geometric distribution, so the maximum varies between runs.
+`layers_traversed` (6–11) shows run-to-run variance because the max graph level is
+set by the highest randomly-assigned level among all 881 inserted nodes. With
+`level_multiplier=1.0`, this follows a geometric distribution, so the maximum varies
+between runs.
 
 #### HNSW vs Flat NSW at Comparable Recall
 
-At this corpus size (881 vectors), HNSW pays more distance computations than Flat NSW for roughly comparable recall bands:
+At this corpus size (881 vectors), HNSW pays more distance computations than Flat NSW
+for roughly comparable recall bands:
 
 | Recall target | Flat NSW                        | Dist Comp | HNSW                                      | Dist Comp | HNSW overhead |
 | ------------- | ------------------------------- | --------: | ----------------------------------------- | --------: | ------------: |
@@ -315,7 +353,12 @@ At this corpus size (881 vectors), HNSW pays more distance computations than Fla
 | ~0.980        | `m=16, ef_search=32` (0.952)    |       170 | `m=16, ef_construction=64, ef_search=32`  |       282 |          +66% |
 | ~0.890        | `m=8, ef_search=64`             |       170 | `m=8, ef_construction=64, ef_search=64`   |       234 |          +38% |
 
-The hierarchical navigation adds overhead (the ~60–115 extra distance computations per query) that is not offset by a better layer-0 entry point at this scale. With only 881 vectors, the random entry point in Flat NSW is already adequate for the beam search to converge. HNSW's advantage — reducing the search starting point to be close to the answer before the expensive beam search — only materialises at corpus sizes where a random entry point would lead to slow convergence.
+The hierarchical navigation adds overhead (the ~60–115 extra distance computations per
+query) that is not offset by a better layer-0 entry point at this scale. With only 881
+vectors, the random entry point in Flat NSW is already adequate for the beam search to
+converge. HNSW's advantage — reducing the search starting point to be close to the
+answer before the expensive beam search — only materialises at corpus sizes where a
+random entry point would lead to slow convergence.
 
 ### Key Learnings
 
@@ -343,15 +386,29 @@ higher m                -> denser graph connectivity, higher recall
 
 **Diagnostic learnings:**
 
-IVF's distance computation cost is exactly `nlist + vectors_scanned`. The `nlist` centroid-scoring is a fixed overhead; `vectors_scanned` is the variable cost controlled by `nprobe`. Setting `nprobe = nlist` degenerates to a full exact scan.
+IVF's distance computation cost is exactly `nlist + vectors_scanned`. The `nlist`
+centroid-scoring is a fixed overhead; `vectors_scanned` is the variable cost
+controlled by `nprobe`. Setting `nprobe = nlist` degenerates to a full exact scan.
 
-In Flat NSW, `visited_nodes` always equals `distance_computations` — every unique node touch corresponds to exactly one distance computation. The graph hop:distance ratio (2.4×–4.1×) reflects wasted edge traversals to already-visited nodes, and grows with both `m` and `ef_search`.
+In Flat NSW, `visited_nodes` always equals `distance_computations` — every unique
+node touch corresponds to exactly one distance computation. The graph hop:distance
+ratio (2.4×–4.1×) reflects wasted edge traversals to already-visited nodes, and grows
+with both `m` and `ef_search`.
 
-In HNSW, `distance_computations > visited_nodes` always. The gap is the **navigation overhead** from greedy upper-layer descent. This gap is approximately constant for a given `m` regardless of `ef_search`, because upper-layer traversal is controlled by `m` and the graph topology, not `ef_search`.
+In HNSW, `distance_computations > visited_nodes` always. The gap is the **navigation
+overhead** from greedy upper-layer descent. This gap is approximately constant for a
+given `m` regardless of `ef_search`, because upper-layer traversal is controlled by
+`m` and the graph topology, not `ef_search`.
 
-At this corpus size (881 vectors), the navigation overhead is net-negative: HNSW uses 38–66% more distance computations than Flat NSW for roughly comparable recall bands. The hierarchy pays off only at scale, where a random entry point to a large graph would cost many more layer-0 beam search iterations to converge.
+At this corpus size (881 vectors), the navigation overhead is net-negative: HNSW uses
+38–66% more distance computations than Flat NSW for roughly comparable recall bands.
+The hierarchy pays off only at scale, where a random entry point to a large graph
+would cost many more layer-0 beam search iterations to converge.
 
-In this benchmark, `ef_construction` primarily affects graph quality and recall. Search-time distance computations are affected much more strongly by `m` and `ef_search`. Changes to `ef_construction` may still indirectly influence traversal efficiency through changes in graph topology.
+In this benchmark, `ef_construction` primarily affects graph quality and recall.
+Search-time distance computations are affected much more strongly by `m` and
+`ef_search`. Changes to `ef_construction` may still indirectly influence traversal
+efficiency through changes in graph topology.
 
 This benchmark demonstrates three distinct ANN philosophies:
 

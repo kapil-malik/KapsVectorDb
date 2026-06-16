@@ -1,6 +1,7 @@
 ## Architecture Evolution
 
-This project intentionally evolves through multiple vector store implementations to explore the tradeoffs behind real-world vector databases.
+This project intentionally evolves through multiple vector store implementations to explore
+the tradeoffs behind real-world vector databases.
 
 ### 1. `NaiveInMemVectorStore`
 
@@ -73,7 +74,8 @@ scores = matrix @ query
 This dramatically improves search performance using optimized native NumPy/BLAS operations.
 
 Tradeoff:
-- Insert performance becomes very poor because the matrix is repeatedly reallocated using `np.vstack(...)`.
+- Insert performance becomes very poor because the matrix is repeatedly reallocated
+  using `np.vstack(...)`.
 
 ---
 

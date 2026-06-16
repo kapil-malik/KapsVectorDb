@@ -7,7 +7,8 @@ The visualization answers:
 
 - How much of the graph does a single search explore? (visited fraction)
 - Are the top-k results reachable from the entry point via a tight traversal path?
-- How does HNSW layer structure affect traversal density — is the base layer (level 0) much denser than upper layers?
+- How does HNSW layer structure affect traversal density — is the base layer (level 0)
+  much denser than upper layers?
 
 All vectors are reduced to 2D via PCA for plotting. Sentence embeddings live in 384 dimensions,
 so the 2D projection retains only ~20% of total variance. Cluster overlap in 2D does not imply
@@ -145,9 +146,10 @@ levels 1–5 adds extra nodes to `visited_node_ids` before the base-layer beam e
 ![HNSW level 1 graph traversal](../../visualizations/output/graph_traversal/graph_hnsw_m8_ef32_chunks200_lvl1_q0.png)
 
 Level 1 is sparser — only ~40% of the 200 nodes are promoted here, and edges show the
-long-range shortcuts that make upper-layer greedy descent fast. `visited_node_ids` at this level
-captures all nodes scored during the full search (greedy descent across all levels + base-layer
-beam), so the visited count appears large relative to the layer. The greedy path through level 1
-typically touches only a handful of nodes (following the best neighbor each step), but the
-base-layer beam dominates the total count. The sparse long-range structure explains why HNSW's
-greedy descent converges quickly — upper-layer edges span large distances in embedding space.
+long-range shortcuts that make upper-layer greedy descent fast. `visited_node_ids` at this
+level captures all nodes scored during the full search (greedy descent across all levels +
+base-layer beam), so the visited count appears large relative to the layer. The greedy path
+through level 1 typically touches only a handful of nodes (following the best neighbor each
+step), but the base-layer beam dominates the total count. The sparse long-range structure
+explains why HNSW's greedy descent converges quickly — upper-layer edges span large distances
+in embedding space.

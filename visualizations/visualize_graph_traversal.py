@@ -10,28 +10,28 @@ vectors to 2D via PCA, and plots:
   - the entry point (blue diamond) and query vector (red star)
 
 Usage (from project root):
-    poetry run python visualizations/visualize_graph_traversal.py \\
-        --store flat_nsw \\
-        --pdf The_DynamoDb_Book.pdf \\
-        --queries-file visualizations/queries.txt \\
-        --query-index 0 \\
+    poetry run python visualizations/visualize_graph_traversal.py \
+        --store flat_nsw \
+        --pdf The_DynamoDb_Book.pdf \
+        --queries-file visualizations/queries.txt \
+        --query-index 0 \
         --max-chunks 200
 
     # HNSW at base layer (default):
-    poetry run python visualizations/visualize_graph_traversal.py \\
-        --store hnsw \\
-        --pdf The_DynamoDb_Book.pdf \\
-        --queries-file visualizations/queries.txt \\
-        --query-index 0 \\
+    poetry run python visualizations/visualize_graph_traversal.py \
+        --store hnsw \
+        --pdf The_DynamoDb_Book.pdf \
+        --queries-file visualizations/queries.txt \
+        --query-index 0 \
         --max-chunks 200
 
     # HNSW upper layer (sparser, shows greedy path):
-    poetry run python visualizations/visualize_graph_traversal.py \\
-        --store hnsw \\
-        --pdf The_DynamoDb_Book.pdf \\
-        --queries-file visualizations/queries.txt \\
-        --query-index 0 \\
-        --max-chunks 200 \\
+    poetry run python visualizations/visualize_graph_traversal.py \
+        --store hnsw \
+        --pdf The_DynamoDb_Book.pdf \
+        --queries-file visualizations/queries.txt \
+        --query-index 0 \
+        --max-chunks 200 \
         --level 1
 """
 
@@ -60,7 +60,10 @@ def load_queries(path: Path) -> list[str]:
     return [ln.strip() for ln in path.read_text().splitlines() if ln.strip()]
 
 
-def embed_chunks(pdf_path: Path, max_chunks: int) -> tuple[list, list[np.ndarray], SentenceTransformerEmbeddingModel]:
+def embed_chunks(
+    pdf_path: Path,
+    max_chunks: int,
+) -> tuple[list, list[np.ndarray], SentenceTransformerEmbeddingModel]:
     print("Loading PDF chunks...")
     chunks = chunks_from_pdf(pdf_path, RecursiveTextChunker())
     if len(chunks) > max_chunks:
@@ -75,20 +78,42 @@ def embed_chunks(pdf_path: Path, max_chunks: int) -> tuple[list, list[np.ndarray
     return chunks, vectors, model
 
 
-def build_flat_nsw(chunks, vectors, m: int, ef_search: int) -> FlatNSWVectorStore:
+def build_flat_nsw(
+    chunks,
+    vectors,
+    m: int,
+    ef_search: int,
+) -> FlatNSWVectorStore:
     print(f"Building FlatNSW (m={m}, ef_search={ef_search})...")
     store = FlatNSWVectorStore(m=m, ef_search=ef_search)
     for i, (chunk, vec) in enumerate(zip(chunks, vectors)):
-        store.insert(VectorRecord(id=str(i), vector=vec, text=chunk.text, metadata=chunk.metadata))
-    print(f"  {store.count()} nodes, {sum(len(v) for v in store._neighbors.values()) // 2} edges")
+        store.insert(VectorRecord(
+            id=str(i),
+            vector=vec,
+            text=chunk.text,
+            metadata=chunk.metadata,
+        ))
+    edge_count = sum(len(v) for v in store._neighbors.values()) // 2
+    print(f"  {store.count()} nodes, {edge_count} edges")
     return store
 
 
-def build_hnsw(chunks, vectors, m: int, ef_construction: int, ef_search: int) -> HNSWVectorStore:
+def build_hnsw(
+    chunks,
+    vectors,
+    m: int,
+    ef_construction: int,
+    ef_search: int,
+) -> HNSWVectorStore:
     print(f"Building HNSW (m={m}, ef_construction={ef_construction}, ef_search={ef_search})...")
     store = HNSWVectorStore(m=m, ef_construction=ef_construction, ef_search=ef_search)
     for i, (chunk, vec) in enumerate(zip(chunks, vectors)):
-        store.insert(VectorRecord(id=str(i), vector=vec, text=chunk.text, metadata=chunk.metadata))
+        store.insert(VectorRecord(
+            id=str(i),
+            vector=vec,
+            text=chunk.text,
+            metadata=chunk.metadata,
+        ))
     n_level0 = len(store._neighbors.get(0, {}))
     print(f"  {store.count()} nodes, max_level={store._max_level}, nodes at level 0={n_level0}")
     return store
@@ -104,7 +129,10 @@ def traverse_flat_nsw(
     diag = SearchDiagnostics(visited_node_ids=[])
     best_candidates = store._search_with_entry_point(query_norm, diag)
     best_candidates.sort(key=lambda x: x[0], reverse=True)
-    results = [(s, rid) for s, rid in best_candidates if rid not in store._tombstone_ids][:top_k]
+    results = [
+        (s, rid) for s, rid in best_candidates
+        if rid not in store._tombstone_ids
+    ][:top_k]
     return diag.visited_node_ids or [], results
 
 
@@ -122,7 +150,10 @@ def traverse_hnsw(
 
     best = store._search_layer(query_norm, current, 0, store.ef_search, diag)
     best.sort(key=lambda x: x[0], reverse=True)
-    results = [(s, rid) for s, rid in best if rid not in store._tombstone_ids][:top_k]
+    results = [
+        (s, rid) for s, rid in best
+        if rid not in store._tombstone_ids
+    ][:top_k]
     return diag.visited_node_ids or [], results
 
 
@@ -197,8 +228,12 @@ def make_plot(
 
     # ── nodes ────────────────────────────────────────────────────────────────
     # Non-visited, non-result nodes (small, gray)
-    non_visited = [nid for nid in node_ids
-                   if nid not in visited_set and nid not in result_ids and nid != entry_point_id]
+    non_visited = [
+        nid for nid in node_ids
+        if nid not in visited_set
+        and nid not in result_ids
+        and nid != entry_point_id
+    ]
     nv_idxs = [id_to_idx[nid] for nid in non_visited if nid in id_to_idx]
     if nv_idxs:
         pts = coords_2d[nv_idxs]
@@ -206,8 +241,12 @@ def make_plot(
                    color="#aaaaaa", s=12, alpha=0.35, linewidths=0, zorder=3)
 
     # Visited nodes (not results, not entry point)
-    visited_plain = [nid for nid in visited_set
-                     if nid not in result_ids and nid != entry_point_id and nid in node_set]
+    visited_plain = [
+        nid for nid in visited_set
+        if nid not in result_ids
+        and nid != entry_point_id
+        and nid in node_set
+    ]
     vp_idxs = [id_to_idx[nid] for nid in visited_plain if nid in id_to_idx]
     if vp_idxs:
         pts = coords_2d[vp_idxs]
@@ -287,28 +326,50 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Visualize graph traversal for FlatNSW or HNSW in 2D via PCA"
     )
-    parser.add_argument("--store", choices=["flat_nsw", "hnsw"], required=True,
-                        help="Which store to build and visualize")
-    parser.add_argument("--pdf", type=Path, required=True,
-                        help="PDF file to index")
-    parser.add_argument("--queries-file", type=Path, required=True,
-                        help="Text file with one query per line")
-    parser.add_argument("--query-index", type=int, default=0,
-                        help="Which query to highlight (default: 0)")
-    parser.add_argument("--top-k", type=int, default=5,
-                        help="Number of results to return (default: 5)")
-    parser.add_argument("--max-chunks", type=int, default=200,
-                        help="Maximum number of PDF chunks to index (default: 200)")
-    parser.add_argument("--m", type=int, default=8,
-                        help="Graph degree parameter M (default: 8)")
-    parser.add_argument("--ef-search", type=int, default=32,
-                        help="ef_search for base-layer search (default: 32)")
-    parser.add_argument("--ef-construction", type=int, default=64,
-                        help="ef_construction (HNSW only, default: 64)")
-    parser.add_argument("--level", type=int, default=0,
-                        help="Which HNSW layer to visualize (default: 0; ignored for flat_nsw)")
-    parser.add_argument("--output-path", type=Path, default=None,
-                        help="Output PNG path (default: output/graph_traversal/<auto>.png)")
+    parser.add_argument(
+        "--store", choices=["flat_nsw", "hnsw"], required=True,
+        help="Which store to build and visualize",
+    )
+    parser.add_argument(
+        "--pdf", type=Path, required=True,
+        help="PDF file to index",
+    )
+    parser.add_argument(
+        "--queries-file", type=Path, required=True,
+        help="Text file with one query per line",
+    )
+    parser.add_argument(
+        "--query-index", type=int, default=0,
+        help="Which query to highlight (default: 0)",
+    )
+    parser.add_argument(
+        "--top-k", type=int, default=5,
+        help="Number of results to return (default: 5)",
+    )
+    parser.add_argument(
+        "--max-chunks", type=int, default=200,
+        help="Maximum number of PDF chunks to index (default: 200)",
+    )
+    parser.add_argument(
+        "--m", type=int, default=8,
+        help="Graph degree parameter M (default: 8)",
+    )
+    parser.add_argument(
+        "--ef-search", type=int, default=32,
+        help="ef_search for base-layer search (default: 32)",
+    )
+    parser.add_argument(
+        "--ef-construction", type=int, default=64,
+        help="ef_construction (HNSW only, default: 64)",
+    )
+    parser.add_argument(
+        "--level", type=int, default=0,
+        help="Which HNSW layer to visualize (default: 0; ignored for flat_nsw)",
+    )
+    parser.add_argument(
+        "--output-path", type=Path, default=None,
+        help="Output PNG path (default: output/graph_traversal/<auto>.png)",
+    )
     args = parser.parse_args()
 
     queries = load_queries(args.queries_file)
@@ -316,8 +377,10 @@ def main() -> None:
         print(f"Error: no queries found in {args.queries_file}")
         sys.exit(1)
     if args.query_index >= len(queries):
-        print(f"Error: --query-index {args.query_index} out of range "
-              f"(file has {len(queries)} queries)")
+        print(
+            f"Error: --query-index {args.query_index} out of range "
+            f"(file has {len(queries)} queries)"
+        )
         sys.exit(1)
     query_text = queries[args.query_index]
 

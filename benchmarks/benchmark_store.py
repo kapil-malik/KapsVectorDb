@@ -148,7 +148,8 @@ def benchmark_delete(
     print(f"requested deletes : {delete_count}")
     print(f"actual deletes    : {deleted}")
     print(f"total time        : {total_time_sec:.4f} sec")
-    print(f"deletes/sec       : {deleted / total_time_sec:.2f}" if total_time_sec > 0 else "deletes/sec       : inf")
+    rate = f"{deleted / total_time_sec:.2f}" if total_time_sec > 0 else "inf"
+    print(f"deletes/sec       : {rate}")
     print(f"remaining count   : {store.count()}")
 
 
@@ -228,9 +229,11 @@ def main():
         description="Benchmark vector store"
     )
 
-    parser.add_argument("--store",
-                        choices=["naive", "normalized", "matrix", "buffered-matrix", "ivf", "file", "mmap"],
-                        default="naive")
+    parser.add_argument(
+        "--store",
+        choices=["naive", "normalized", "matrix", "buffered-matrix", "ivf", "file", "mmap"],
+        default="naive",
+    )
     parser.add_argument("--records", type=int, default=10_000)
     parser.add_argument("--dim", type=int, default=384)
     parser.add_argument("--queries", type=int, default=100)

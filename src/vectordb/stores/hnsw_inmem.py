@@ -97,7 +97,9 @@ class HNSWVectorStore:
                 ef=self.ef_construction,
             )
 
-            neighbor_ids = self._select_neighbors(candidates, max_neighbors=self.m, exclude_id=record.id)
+            neighbor_ids = self._select_neighbors(
+                candidates, max_neighbors=self.m, exclude_id=record.id
+            )
 
             for neighbor_id in neighbor_ids:
                 self._neighbors[level][record.id].add(neighbor_id)
@@ -177,7 +179,9 @@ class HNSWVectorStore:
 
         # 1. Greedy descent from top layer to layer 1.
         for level in range(self._max_level, 0, -1):
-            current_entry = self._greedy_search_layer(normalized_query_vector, current_entry, level, diag)
+            current_entry = self._greedy_search_layer(
+                normalized_query_vector, current_entry, level, diag
+            )
 
         # 2. Wider ef_search at layer 0.
         best_candidates = self._search_layer(
