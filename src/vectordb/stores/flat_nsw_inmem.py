@@ -213,7 +213,10 @@ class FlatNSWVectorStore:
         heapq.heappush(candidates, (-entry_score, entry_id))
         heapq.heappush(best_results, (entry_score, entry_id))
         visited.add(entry_id)
-        if diag: diag.visited_nodes += 1
+        if diag:
+            diag.visited_nodes += 1
+            if diag.visited_node_ids is not None:
+                diag.visited_node_ids.append(entry_id)
 
         while candidates:
             current_score, current_id = heapq.heappop(candidates)
@@ -232,7 +235,10 @@ class FlatNSWVectorStore:
                     continue
 
                 visited.add(neighbor_id)
-                if diag: diag.visited_nodes += 1
+                if diag:
+                    diag.visited_nodes += 1
+                    if diag.visited_node_ids is not None:
+                        diag.visited_node_ids.append(neighbor_id)
 
                 neighbor_score = dot_similarity(normalized_query_vector, self._vectors[neighbor_id])
                 if diag: diag.distance_computations += 1

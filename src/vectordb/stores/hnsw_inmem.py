@@ -229,7 +229,10 @@ class HNSWVectorStore:
         ) -> str:
         current_id = entry_id
         current_score = dot_similarity(query_vector, self._vectors[current_id])
-        if diag: diag.distance_computations += 1
+        if diag:
+            diag.distance_computations += 1
+            if diag.visited_node_ids is not None:
+                diag.visited_node_ids.append(entry_id)
 
         improved = True
 
@@ -241,7 +244,10 @@ class HNSWVectorStore:
                     continue
 
                 neighbor_score = dot_similarity(query_vector, self._vectors[neighbor_id])
-                if diag: diag.distance_computations += 1
+                if diag:
+                    diag.distance_computations += 1
+                    if diag.visited_node_ids is not None:
+                        diag.visited_node_ids.append(neighbor_id)
                 if neighbor_score > current_score:
                     current_id = neighbor_id
                     current_score = neighbor_score
@@ -274,7 +280,10 @@ class HNSWVectorStore:
         heapq.heappush(candidates, (-entry_score, entry_id))
         heapq.heappush(best_results, (entry_score, entry_id))
         visited.add(entry_id)
-        if diag: diag.visited_nodes += 1
+        if diag:
+            diag.visited_nodes += 1
+            if diag.visited_node_ids is not None:
+                diag.visited_node_ids.append(entry_id)
 
         while candidates:
             current_neg_score, current_id = heapq.heappop(candidates)
@@ -291,7 +300,10 @@ class HNSWVectorStore:
                     continue
 
                 visited.add(neighbor_id)
-                if diag: diag.visited_nodes += 1
+                if diag:
+                    diag.visited_nodes += 1
+                    if diag.visited_node_ids is not None:
+                        diag.visited_node_ids.append(neighbor_id)
 
                 neighbor_score = dot_similarity(query_vector, self._vectors[neighbor_id])
                 if diag: diag.distance_computations += 1

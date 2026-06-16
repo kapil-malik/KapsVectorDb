@@ -63,3 +63,4 @@ class SearchDiagnostics:
     layers_traversed: int = 0       # layers descended through (HNSW: max_level+1, NSW: 1)
     clusters_scanned: int = 0       # nprobe clusters probed (IVF only)
     vectors_scanned: int = 0        # candidate vectors in selected clusters (IVF only)
+    visited_node_ids: list[str] | None = None  # opt-in: IDs added to visited set; None = don't collect
