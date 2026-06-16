@@ -134,3 +134,4 @@ Detailed project documentation:
 - [Architecture Evolution](docs/architecture.md)
 - [Benchmarking & Learnings](docs/benchmarks.md)
 - [Project Roadmap](docs/roadmap.md)
+- [ANN Visualizations](docs/visualizations.md)
