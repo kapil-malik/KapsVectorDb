@@ -7,6 +7,8 @@ from statistics import mean
 import numpy as np
 from tqdm import tqdm
 
+from benchmarks.benchmark_helpers import generate_random_vector, generate_records, percentile
+
 from vectordb.models import VectorRecord
 from vectordb.store_base import VectorStore
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
@@ -27,46 +29,6 @@ def clean_file_store_data(path: str = "benchmark_file_store") -> None:
     store_path.mkdir(parents=True, exist_ok=True)
 
 
-def generate_random_vector(dim: int) -> np.ndarray:
-    """
-    Generate one random vector.
-
-    We use float32 because real embedding vectors are commonly stored as float32,
-    not Python float/double.
-    """
-    return np.random.random(dim).astype(np.float32)
-
-
-def generate_records(num_records: int, dim: int) -> list[VectorRecord]:
-    records = []
-
-    for i in tqdm(range(num_records), desc="Generating vectors"):
-        records.append(
-            VectorRecord(
-                id=f"record-{i}",
-                vector=np.random.random(dim).astype(np.float32),
-                text=f"Synthetic text for record {i}",
-                metadata={"source": "synthetic"},
-            )
-        )
-
-    return records
-
-
-def percentile(values: list[float], p: float) -> float:
-    """
-    Simple percentile helper.
-
-    Example:
-    p=50 gives median.
-    p=95 gives 95th percentile.
-    """
-    if not values:
-        raise ValueError("values must not be empty")
-
-    sorted_values = sorted(values)
-    index = int((p / 100) * (len(sorted_values) - 1))
-    return sorted_values[index]
 
 
 def benchmark_insert(
@@ -251,7 +213,7 @@ def main():
     store = create_store(args.store)
 
     if not args.skip_insert:
-        records = generate_records(args.records, args.dim)
+        records = generate_records(args.records, args.dim, desc="Generating vectors")
 
         if args.delete_count > 0:
             undeleted_records = records[args.delete_count:]

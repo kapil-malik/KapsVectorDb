@@ -1,0 +1,18 @@
+{"id": "q1", "text": "How does a naive vector store perform search?"}
+{"id": "q2", "text": "Why do normalized vectors make search faster?"}
+{"id": "q3", "text": "How does matrix-backed search improve performance?"}
+{"id": "q4", "text": "Why does buffering help insert performance?"}
+{"id": "q5", "text": "What is compaction in a persistent vector store?"}
+{"id": "q6", "text": "What are tombstones used for?"}
+{"id": "q7", "text": "How does IVF approximate nearest neighbor search work?"}
+{"id": "q8", "text": "What is the difference between nlist and nprobe?"}
+{"id": "q9", "text": "How does HNSW use multiple graph layers?"}
+{"id": "q10", "text": "What does ef_search control in HNSW?"}
+{"id": "q11", "text": "What diagnostics are useful for graph-based ANN search?"}
+{"id": "q12", "text": "How does semantic retrieval work in a RAG system?"}
+{"id": "q13", "text": "Why does chunking affect retrieval quality?"}
+{"id": "q14", "text": "What is Recall at K?"}
+{"id": "q15", "text": "What is Mean Reciprocal Rank?"}
+{"id": "q16", "text": "Why is nDCG useful for retrieval evaluation?"}
+{"id": "q17", "text": "How can MMR reduce repetitive search results?"}
+{"id": "q18", "text": "Why can approximate nearest neighbor search reduce latency?"}

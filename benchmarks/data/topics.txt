@@ -1,0 +1,60 @@
+running and cardiovascular endurance
+marathon training strategies
+strength training for beginners
+muscle recovery and mobility
+high intensity interval training
+nutrition for endurance athletes
+fat loss and calorie management
+yoga and flexibility improvement
+mental health through exercise
+sleep optimization for fitness
+personal finance and budgeting
+long term wealth creation
+retirement planning strategies
+mutual funds and SIP investing
+stock market fundamentals
+risk management in investing
+tax saving investment options
+financial independence planning
+emergency fund management
+behavioral finance and investing psychology
+healthy communication in relationships
+building trust in friendships
+conflict resolution in marriage
+emotional intelligence in relationships
+work life balance in families
+parenting and emotional support
+coping with loneliness
+setting healthy personal boundaries
+maintaining long distance relationships
+social anxiety and self confidence
+large language models and transformers
+retrieval augmented generation systems
+agentic AI workflows
+multi agent collaboration systems
+fine tuning machine learning models
+AI observability and monitoring
+prompt engineering techniques
+vector embeddings and semantic search
+AI memory and reasoning systems
+evaluation of generative AI systems
+vector databases and ANN indexing
+IVF indexing techniques
+HNSW graph based search
+semantic chunking strategies
+metadata filtering in vector search
+hybrid retrieval systems
+persistent vector storage design
+vector quantization methods
+embedding similarity metrics
+vector database compaction strategies
+distributed systems and scalability
+Kafka stream processing systems
+distributed consensus algorithms
+event driven microservices
+distributed caching strategies
+load balancing and traffic shaping
+distributed tracing and observability
+real time data processing pipelines
+fault tolerance in distributed systems
+database replication and sharding

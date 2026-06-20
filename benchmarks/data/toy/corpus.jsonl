@@ -1,0 +1,31 @@
+{"id": "exact_001", "text": "A naive in-memory vector store keeps every vector in a Python dictionary and computes cosine similarity against every record during search."}
+{"id": "exact_002", "text": "Normalized vector search precomputes unit vectors at insert time so that search can use a dot product instead of cosine similarity."}
+{"id": "exact_003", "text": "A matrix-backed vector store stores vectors in a contiguous NumPy matrix and performs search using vectorized matrix multiplication."}
+{"id": "exact_004", "text": "Buffered matrix stores improve insert performance by collecting new vectors in a small buffer before merging them into the main matrix."}
+{"id": "exact_005", "text": "Exact vector search scans all records and returns the true nearest neighbors according to the chosen similarity function."}
+{"id": "persist_001", "text": "A file-backed vector store persists records to disk so that vectors and metadata can survive process restarts."}
+{"id": "persist_002", "text": "Tombstones mark deleted records without immediately rewriting the entire vector file."}
+{"id": "persist_003", "text": "Compaction rewrites live records and removes tombstoned records from physical storage."}
+{"id": "persist_004", "text": "Memory-mapped vector storage can improve read performance by allowing large vector matrices to be accessed without loading everything eagerly."}
+{"id": "persist_005", "text": "Metadata filtering restricts search results to records whose metadata matches the requested constraints."}
+{"id": "ann_001", "text": "Approximate nearest neighbor search trades a small amount of recall for lower query latency on large vector collections."}
+{"id": "ann_002", "text": "IVF partitions vectors into clusters using centroids and searches only a subset of inverted lists during query time."}
+{"id": "ann_003", "text": "The nlist parameter controls how many clusters are created in an IVF index."}
+{"id": "ann_004", "text": "The nprobe parameter controls how many IVF clusters are searched for each query."}
+{"id": "ann_005", "text": "If nprobe is too low, IVF may miss relevant vectors that are located in neighboring clusters."}
+{"id": "ann_006", "text": "NSW graph search connects vectors to nearby neighbors and performs greedy traversal through the graph."}
+{"id": "ann_007", "text": "HNSW improves graph search by adding multiple layers, where upper layers provide long-range shortcuts and lower layers provide detailed local search."}
+{"id": "ann_008", "text": "The ef_search parameter controls how broadly HNSW explores candidate nodes during search."}
+{"id": "ann_009", "text": "The ef_construction parameter controls how much work HNSW does while building graph connections."}
+{"id": "ann_010", "text": "Graph-based ANN indexes often expose diagnostics such as visited nodes, graph hops, and distance computations."}
+{"id": "rag_001", "text": "A semantic retriever embeds user queries and text chunks into the same vector space before performing similarity search."}
+{"id": "rag_002", "text": "PDF ingestion extracts text from pages and splits it into chunks before embedding and indexing."}
+{"id": "rag_003", "text": "Chunking strategy affects retrieval quality because very small chunks may lose context while very large chunks may include too much unrelated text."}
+{"id": "rag_004", "text": "Retrieval augmented generation uses retrieved chunks as context for a language model to answer user questions."}
+{"id": "rag_005", "text": "Poor retrieval can cause a RAG system to miss important facts or include irrelevant context."}
+{"id": "quality_001", "text": "Retrieval quality evaluation compares retrieved results against human-labeled relevant documents."}
+{"id": "quality_002", "text": "Recall at K measures how many relevant documents were retrieved within the top K results."}
+{"id": "quality_003", "text": "Precision at K measures how many of the top K retrieved results are actually relevant."}
+{"id": "quality_004", "text": "Mean reciprocal rank measures how early the first relevant result appears in the ranked list."}
+{"id": "quality_005", "text": "nDCG rewards highly relevant documents appearing earlier in the ranked results and supports graded relevance labels."}
+{"id": "quality_006", "text": "Maximal marginal relevance balances query similarity with diversity so that retrieved chunks are not overly repetitive."}

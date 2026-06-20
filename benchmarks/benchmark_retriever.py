@@ -4,16 +4,9 @@ from statistics import mean
 
 from tqdm import tqdm
 
-from vectordb.embeddings.fake import FakeHashEmbeddingModel
-from vectordb.embeddings.sentence_transformer import SentenceTransformerEmbeddingModel
+from benchmarks.benchmark_helpers import create_embedding_model, percentile
 from vectordb.retrieval.semantic_text_retriever import SemanticTextRetriever
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
-
-
-def percentile(values: list[float], p: float) -> float:
-    sorted_values = sorted(values)
-    index = int((p / 100) * (len(sorted_values) - 1))
-    return sorted_values[index]
 
 
 def generate_synthetic_chunks(num_chunks: int) -> list[str]:
@@ -35,16 +28,6 @@ def generate_synthetic_chunks(num_chunks: int) -> list[str]:
         )
 
     return chunks
-
-
-def create_embedding_model(model_type: str):
-    if model_type == "fake":
-        return FakeHashEmbeddingModel(dimension=384)
-
-    if model_type == "sentence-transformer":
-        return SentenceTransformerEmbeddingModel()
-
-    raise ValueError(f"Unknown model type: {model_type}")
 
 
 def main():

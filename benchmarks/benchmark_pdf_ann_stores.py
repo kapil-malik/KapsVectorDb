@@ -9,8 +9,14 @@ from typing import Any
 from dataclasses import dataclass
 
 import numpy as np
-from tqdm import tqdm
 
+from benchmarks.benchmark_helpers import (
+    embed_texts,
+    insert_records,
+    load_lines,
+    maybe_build_store,
+    percentile,
+)
 from vectordb.embeddings.sentence_transformer import SentenceTransformerEmbeddingModel
 from vectordb.ingestion.chunker import RecursiveTextChunker
 from vectordb.ingestion.pdf_ingestion import chunks_from_pdf
@@ -44,40 +50,6 @@ class BenchmarkRow:
     diag_avg_vectors_scanned: int = 0
 
 
-def percentile(values: list[float], p: float) -> float:
-    if not values:
-        return 0.0
-
-    sorted_values = sorted(values)
-    index = int((p / 100) * (len(sorted_values) - 1))
-    return sorted_values[index]
-
-
-def load_queries(path: str) -> list[str]:
-    query_path = Path(path)
-
-    if not query_path.exists():
-        raise FileNotFoundError(f"Queries file not found: {path}")
-
-    queries = [
-        line.strip()
-        for line in query_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-
-    if not queries:
-        raise ValueError(f"No queries found in {path}")
-
-    return queries
-
-
-def embed_texts(embedding_model, texts: list[str], desc: str):
-    vectors = []
-
-    for text in tqdm(texts, desc=desc):
-        vectors.append(embedding_model.embed(text))
-
-    return vectors
 
 
 def build_records(chunks, vectors) -> list[VectorRecord]:
@@ -99,24 +71,6 @@ def build_records(chunks, vectors) -> list[VectorRecord]:
     return records
 
 
-def insert_records(store, records: list[VectorRecord]) -> float:
-    start = time.perf_counter()
-
-    for record in records:
-        store.insert(record)
-
-    end = time.perf_counter()
-    return end - start
-
-
-def maybe_build_store(store) -> float:
-    if hasattr(store, "build"):
-        start = time.perf_counter()
-        store.build()
-        end = time.perf_counter()
-        return end - start
-
-    return 0.0
 
 
 def recall_at_k(exact_ids: list[str], candidate_ids: list[str], k: int) -> float:
@@ -231,7 +185,7 @@ def main():
 
     print(f"PDF chunks: {len(chunks)}")
 
-    queries = load_queries(args.queries_file)
+    queries = load_lines(args.queries_file)
     print(f"Queries   : {len(queries)}")
 
     print("\nEmbedding PDF chunks")

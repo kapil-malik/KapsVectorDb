@@ -1,40 +1,22 @@
 import argparse
 import time
+from pathlib import Path
 from statistics import mean
 
 from tqdm import tqdm
 
-from vectordb.embeddings.fake import FakeHashEmbeddingModel
-from vectordb.embeddings.sentence_transformer import SentenceTransformerEmbeddingModel
+from benchmarks.benchmark_helpers import (
+    create_embedding_model,
+    embed_texts,
+    insert_records,
+    load_lines,
+    percentile,
+    print_latency_stats,
+    search_with_latency,
+)
 from vectordb.models import VectorRecord
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.ivf_inmem import IVFVectorStore
-from pathlib import Path
-
-def load_lines(file_path: str) -> list[str]:
-    path = Path(file_path)
-
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    lines = []
-
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            stripped = line.strip()
-
-            if stripped:
-                lines.append(stripped)
-
-    if not lines:
-        raise ValueError(f"No non-empty lines found in {file_path}")
-
-    return lines
-
-def percentile(values: list[float], p: float) -> float:
-    sorted_values = sorted(values)
-    index = int((p / 100) * (len(sorted_values) - 1))
-    return sorted_values[index]
 
 
 def generate_chunks_from_topics(
@@ -64,23 +46,6 @@ def generate_queries_from_templates(
         for i in range(num_queries)
     ]
 
-def create_embedding_model(model_type: str):
-    if model_type == "fake":
-        return FakeHashEmbeddingModel(dimension=384)
-
-    if model_type == "sentence-transformer":
-        return SentenceTransformerEmbeddingModel()
-
-    raise ValueError(f"Unknown model type: {model_type}")
-
-
-def embed_texts(embedding_model, texts: list[str], desc: str):
-    vectors = []
-
-    for text in tqdm(texts, desc=desc):
-        vectors.append(embedding_model.embed(text))
-
-    return vectors
 
 
 def create_records(chunks: list[str], vectors) -> list[VectorRecord]:
@@ -104,17 +69,6 @@ def create_records(chunks: list[str], vectors) -> list[VectorRecord]:
     return records
 
 
-def insert_records(store, records: list[VectorRecord]) -> None:
-    for record in tqdm(records, desc=f"Inserting into {store.__class__.__name__}"):
-        store.insert(record)
-
-
-def search_with_latency(store, query_vector, top_k: int):
-    start = time.perf_counter()
-    results = store.search(query_vector=query_vector, top_k=top_k)
-    end = time.perf_counter()
-
-    return results, (end - start) * 1000
 
 
 def recall_at_k(exact_ids: list[str], candidate_ids: list[str], k: int) -> float:
@@ -125,15 +79,6 @@ def recall_at_k(exact_ids: list[str], candidate_ids: list[str], k: int) -> float
         return 0.0
 
     return len(exact_top_k.intersection(candidate_top_k)) / k
-
-
-def print_latency_stats(title: str, latencies_ms: list[float]) -> None:
-    print(f"\n{title}")
-    print("-" * len(title))
-    print(f"avg latency   : {mean(latencies_ms):.4f} ms")
-    print(f"p50 latency   : {percentile(latencies_ms, 50):.4f} ms")
-    print(f"p95 latency   : {percentile(latencies_ms, 95):.4f} ms")
-    print(f"p99 latency   : {percentile(latencies_ms, 99):.4f} ms")
 
 
 def benchmark_ivf_recall_with_embeddings(
@@ -173,8 +118,8 @@ def benchmark_ivf_recall_with_embeddings(
         buffer_size=1024,
     )
 
-    insert_records(exact_store, records)
-    insert_records(ivf_store, records)
+    insert_records(exact_store, records, desc=f"Inserting into {exact_store.__class__.__name__}")
+    insert_records(ivf_store, records, desc=f"Inserting into {ivf_store.__class__.__name__}")
 
     print("\nBuilding IVF index")
     print("------------------")

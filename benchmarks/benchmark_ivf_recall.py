@@ -5,29 +5,17 @@ from statistics import mean
 import numpy as np
 from tqdm import tqdm
 
+from benchmarks.benchmark_helpers import (
+    generate_random_vector,
+    generate_records,
+    insert_records,
+    percentile,
+    print_latency_stats,
+    search_with_latency,
+)
 from vectordb.models import VectorRecord
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.ivf_inmem import IVFVectorStore
-
-
-def generate_random_vector(dim: int) -> np.ndarray:
-    return np.random.random(dim).astype(np.float32)
-
-
-def generate_records(num_records: int, dim: int) -> list[VectorRecord]:
-    records = []
-
-    for i in tqdm(range(num_records), desc="Generating records"):
-        records.append(
-            VectorRecord(
-                id=f"record-{i}",
-                vector=generate_random_vector(dim),
-                text=f"Synthetic text for record {i}",
-                metadata={"source": "synthetic"},
-            )
-        )
-
-    return records
 
 
 def generate_queries(num_queries: int, dim: int) -> list[np.ndarray]:
@@ -35,26 +23,6 @@ def generate_queries(num_queries: int, dim: int) -> list[np.ndarray]:
         generate_random_vector(dim)
         for _ in tqdm(range(num_queries), desc="Generating queries")
     ]
-
-
-def percentile(values: list[float], p: float) -> float:
-    sorted_values = sorted(values)
-    index = int((p / 100) * (len(sorted_values) - 1))
-    return sorted_values[index]
-
-
-def insert_records(store, records: list[VectorRecord]) -> None:
-    for record in tqdm(records, desc=f"Inserting into {store.__class__.__name__}"):
-        store.insert(record)
-
-
-def search_with_latency(store, query: np.ndarray, top_k: int):
-    start = time.perf_counter()
-    results = store.search(query_vector=query, top_k=top_k)
-    end = time.perf_counter()
-
-    latency_ms = (end - start) * 1000
-    return results, latency_ms
 
 
 def recall_at_k(exact_ids: list[str], candidate_ids: list[str], k: int) -> float:
@@ -81,8 +49,8 @@ def benchmark_ivf_recall(
         buffer_size=1024,
     )
 
-    insert_records(exact_store, records)
-    insert_records(ivf_store, records)
+    insert_records(exact_store, records, desc=f"Inserting into {exact_store.__class__.__name__}")
+    insert_records(ivf_store, records, desc=f"Inserting into {ivf_store.__class__.__name__}")
 
     print("\nBuilding IVF index")
     print("------------------")
@@ -128,19 +96,8 @@ def benchmark_ivf_recall(
     print(f"nlist         : {nlist}")
     print(f"nprobe        : {nprobe}")
 
-    print("\nExact baseline latency")
-    print("----------------------")
-    print(f"avg latency   : {mean(exact_latencies_ms):.4f} ms")
-    print(f"p50 latency   : {percentile(exact_latencies_ms, 50):.4f} ms")
-    print(f"p95 latency   : {percentile(exact_latencies_ms, 95):.4f} ms")
-    print(f"p99 latency   : {percentile(exact_latencies_ms, 99):.4f} ms")
-
-    print("\nIVF latency")
-    print("-----------")
-    print(f"avg latency   : {mean(ivf_latencies_ms):.4f} ms")
-    print(f"p50 latency   : {percentile(ivf_latencies_ms, 50):.4f} ms")
-    print(f"p95 latency   : {percentile(ivf_latencies_ms, 95):.4f} ms")
-    print(f"p99 latency   : {percentile(ivf_latencies_ms, 99):.4f} ms")
+    print_latency_stats("Exact baseline latency", exact_latencies_ms)
+    print_latency_stats("IVF latency", ivf_latencies_ms)
 
     print("\nRecall")
     print("------")

@@ -1,0 +1,50 @@
+What are the key properties of DynamoDB?
+When should I use DynamoDB instead of another database?
+How does DynamoDB compare to relational databases?
+Explain primary keys and secondary indexes in DynamoDB.
+What are item collections, and why are they important?
+What are DynamoDB Streams used for?
+How does TTL work in DynamoDB?
+What are DynamoDB partitions, and why do they matter?
+Explain consistency options in DynamoDB.
+What are the three DynamoDB API action types?
+How is Query different from Scan in DynamoDB?
+Why does DynamoDB discourage inefficient access patterns?
+How do expression names and values work in DynamoDB?
+What are Key Condition Expressions, Filter Expressions, and Projection Expressions?
+Why should I avoid using an ORM with DynamoDB?
+What is single-table design, and when should I avoid it?
+How should I model one-to-many relationships in DynamoDB?
+Compare adjacency lists, shallow duplication, and materialized graphs for many-to-many relationships.
+What strategies can I use for filtering and sorting in DynamoDB?
+How would I model a GitHub-like backend or e-commerce app using DynamoDB?
+How does DynamoDB achieve horizontal scalability?
+What causes hot partitions in DynamoDB, and how can they be avoided?
+Explain partition key selection best practices.
+What are the tradeoffs between simple and composite primary keys?
+How does DynamoDB distribute data across partitions?
+What are sparse indexes, and when should I use them?
+How do global secondary indexes differ from local secondary indexes?
+What limitations should I consider when designing GSIs?
+How can DynamoDB Streams be integrated with Lambda?
+Explain the role of DynamoDB in event-driven architectures.
+What is optimistic locking in DynamoDB?
+How do conditional writes work?
+Explain atomic counters in DynamoDB.
+How do transactions work in DynamoDB?
+What are the limitations and costs of DynamoDB transactions?
+What is adaptive capacity?
+How does provisioned throughput differ from on-demand mode?
+How should I estimate read and write capacity units?
+Explain strongly consistent reads versus eventually consistent reads.
+How does DynamoDB pricing work?
+What causes throttling in DynamoDB?
+How can exponential backoff help with throttling?
+What are common anti-patterns in DynamoDB schema design?
+Why are joins discouraged in DynamoDB?
+How should access patterns drive schema design?
+What denormalization techniques are commonly used in DynamoDB?
+How do composite sort keys improve query flexibility?
+How can I model hierarchical data in DynamoDB?
+How can I implement time-series data models in DynamoDB?
+What are the advantages and disadvantages of single-table design?
