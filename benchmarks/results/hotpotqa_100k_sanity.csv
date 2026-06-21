@@ -1,0 +1,2 @@
+store,store_parameters,records,queries,top_k,insert_time_sec,build_time_sec,prepare_time_sec,avg_latency_ms,p50_latency_ms,p95_latency_ms,p99_latency_ms,precision_at_k,recall_at_k,hit_rate_at_k,mrr_at_k,ndcg_at_k
+buffered,"{""buffer_size"": 1024}",100000,7405,10,1.483600125000521,0.0,1.483600125000521,4.789906763543759,4.822541000066849,5.189742000220576,5.354945319813851,0.14141796083727212,0.7070898041863606,0.9385550303848751,0.8592555437660097,0.6937278240111161

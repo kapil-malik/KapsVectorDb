@@ -218,3 +218,18 @@ __marimo__/
 .streamlit/secrets.toml
 
 .DS_Store
+
+# PDFs
+*.pdf
+
+# Store runtime artifacts
+records.jsonl
+tombstones.txt
+vectors.npy
+
+# BEIR datasets (large, re-downloadable via benchmarks/download_beir_dataset.py)
+data/retrieval_quality/beir/fiqa/
+data/retrieval_quality/beir/hotpotqa_100k/
+
+# Embedding caches
+data/retrieval_quality/cache/

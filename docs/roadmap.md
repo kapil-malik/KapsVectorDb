@@ -166,11 +166,15 @@ Understand how modern vector databases scale similarity search using partition-b
 Goal:
 Measure retrieval quality, not just latency/performance.
 
-#### M5.1 — Quality Benchmarks ⏳
-- Recall@k
-- MRR (Mean Reciprocal Rank)
-- Retrieval relevance evaluation
-- Labeled query/chunk datasets
+#### M5.1 — Quality Benchmarks ✅
+- `benchmark_retrieval_quality.py` — end-to-end retrieval quality benchmark against labeled qrels
+- `download_beir_dataset.py` — BEIR dataset download and conversion to `corpus.jsonl` / `queries.jsonl` / `qrels.tsv`
+- Metrics: Precision@K, Recall@K, HitRate@K, MRR@K, nDCG@K
+- Evaluated on SciFact (5k), FiQA (57k), and HotpotQA (100k) corpora
+- Compared buffered (exact), IVF, FlatNSW v2, and HNSW stores
+- Embedding cache to avoid re-embedding across runs
+- Build cache to reuse constructed indices across `ef_search` sweep values
+- `FlatNSWV2VectorStore` — approximate construction variant for large-corpus benchmarking
 
 #### M5.2 — Hybrid Retrieval ⏳
 - BM25 + vector search

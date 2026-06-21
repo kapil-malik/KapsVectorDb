@@ -186,6 +186,23 @@ Tradeoff:
 
 This is currently a single-layer NSW graph, not full HNSW yet.
 
+#### `FlatNSWVectorStore` vs `FlatNSWV2VectorStore`
+
+`FlatNSWVectorStore` (v1) selects neighbors during insert by scanning all existing
+vectors exactly — O(N) distance computations per insert, making the full build O(N²).
+This produces a high-quality graph but becomes impractical as the corpus grows.
+
+`FlatNSWV2VectorStore` (v2) replaces the exact scan with a graph-based beam search
+using `ef_construction` candidates, the same approach used in HNSW layer-0
+construction. Build cost drops to approximately O(N · ef_construction), which is
+sub-quadratic and viable at tens-of-thousands of vectors and beyond. The tradeoff is
+a slightly lower-quality graph: approximate neighbor selection can miss ideal edges,
+so retrieval quality at equivalent `m` and `ef_search` is marginally lower than v1.
+Raising `ef_construction` recovers quality at the cost of longer build time.
+
+**Rule of thumb:** use v1 for small corpora where build time is not a concern; use v2
+when the corpus is large enough that v1's O(N²) build becomes a bottleneck.
+
 ### 9. `HNSWVectorStore`
 
 Hierarchical Navigable Small World (HNSW) graph-based ANN vector store.
@@ -232,5 +249,6 @@ Tradeoff:
 | `FileBackedVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized operations) | Yes | Disk-backed |
 | `MMapVectorStore` | O(B × D) (buffered inserts) | O(N × D) (vectorized mmap search) | Yes | Larger-than-memory datasets |
 | `IVFVectorStore` | O(B × D) + build step | O((N / nlist) × nprobe × D) approximate search | No | ANN search with clustering |
-| `FlatNSWVectorStore` | O(N × D) (graph neighbor discovery) | Approximate graph traversal | No | ANN search with graph index |
+| `FlatNSWVectorStore` | O(N × D) per insert — exact neighbor scan | Approximate graph traversal | No | Small corpora; best graph quality |
+| `FlatNSWV2VectorStore` | O(ef_construction × D) per insert — approximate | Approximate graph traversal | No | Large corpora; sub-quadratic build |
 | `HNSWVectorStore` | O(log N) layer navigation + graph maintenance | Approximate hierarchical graph traversal | No | ANN search with hierarchical graph index |

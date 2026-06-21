@@ -1,6 +1,7 @@
 import argparse
 import csv
 import dataclasses
+import itertools
 import json
 import time
 from dataclasses import dataclass
@@ -13,13 +14,16 @@ from tqdm import tqdm
 from benchmarks.benchmark_helpers import (
     create_embedding_model,
     embed_texts,
+    embed_texts_with_cache,
     insert_records,
     maybe_build_store,
+    parse_int_list,
     percentile,
 )
 from vectordb.models import VectorRecord
 from vectordb.stores.buffered_matrix_inmem import BufferedMatrixInMemVectorStore
 from vectordb.stores.flat_nsw_inmem import FlatNSWVectorStore
+from vectordb.stores.flat_nsw_inmem_v2 import FlatNSWV2VectorStore
 from vectordb.stores.hnsw_inmem import HNSWVectorStore
 from vectordb.stores.ivf_inmem import IVFVectorStore
 
@@ -40,6 +44,7 @@ class QueryEvaluation:
 @dataclass(frozen=True)
 class RetrievalQualityBenchmarkRow:
     store: str
+    store_parameters: str
     records: int
     queries: int
     top_k: int
@@ -63,7 +68,10 @@ def load_corpus(dataset_dir: Path) -> dict[str, str]:
     with open(dataset_dir / "corpus.jsonl", "r", encoding="utf-8") as f:
         for line in f:
             row = json.loads(line)
-            corpus[row["id"]] = row["text"]
+            doc_id = row["id"]
+            if doc_id in corpus:
+                raise ValueError(f"Duplicate doc_id in corpus.jsonl: {doc_id!r}")
+            corpus[doc_id] = row["text"]
 
     return corpus
 
@@ -74,7 +82,10 @@ def load_queries(dataset_dir: Path) -> dict[str, str]:
     with open(dataset_dir / "queries.jsonl", "r", encoding="utf-8") as f:
         for line in f:
             row = json.loads(line)
-            queries[row["id"]] = row["text"]
+            query_id = row["id"]
+            if query_id in queries:
+                raise ValueError(f"Duplicate query_id in queries.jsonl: {query_id!r}")
+            queries[query_id] = row["text"]
 
     return queries
 
@@ -107,6 +118,33 @@ def load_dataset(dataset_dir: Path) -> tuple[
     )
 
 
+def validate_dataset(
+    corpus: dict[str, str],
+    queries: dict[str, str],
+    qrels: dict[str, dict[str, int]],
+) -> None:
+    unknown_qrel_queries = sorted(set(qrels.keys()) - set(queries.keys()))
+    if unknown_qrel_queries:
+        raise ValueError(
+            f"qrels reference {len(unknown_qrel_queries)} query_id(s) not in queries.jsonl: "
+            f"{unknown_qrel_queries[:10]}"
+        )
+
+    missing_qrels = sorted(set(queries.keys()) - set(qrels.keys()))
+    if missing_qrels:
+        raise ValueError(
+            f"Missing qrels for {len(missing_qrels)} queries: {missing_qrels[:10]}"
+        )
+
+    all_qrel_doc_ids = {doc_id for qrel in qrels.values() for doc_id in qrel}
+    unknown_doc_ids = sorted(all_qrel_doc_ids - set(corpus.keys()))
+    if unknown_doc_ids:
+        raise ValueError(
+            f"qrels reference {len(unknown_doc_ids)} doc_id(s) not in corpus.jsonl: "
+            f"{unknown_doc_ids[:10]}"
+        )
+
+
 def build_records(
     corpus_ids: list[str],
     corpus: dict[str, str],
@@ -130,35 +168,99 @@ def build_records(
     return records
 
 
-ALL_STORES = ["buffered", "ivf", "flat_nsw", "hnsw"]
+ALL_STORES = ["buffered", "ivf", "flat_nsw_v2", "hnsw"]
 
 
-def create_store(store_name: str, args):
+def param_grid(store_name: str, args) -> list[dict]:
     if store_name == "buffered":
-        return BufferedMatrixInMemVectorStore(buffer_size=args.buffer_size)
+        return [{"buffer_size": args.buffer_size}]
+
+    if store_name == "ivf":
+        return [
+            {"buffer_size": args.buffer_size, "nlist": nlist, "nprobe": nprobe}
+            for nlist, nprobe in itertools.product(args.ivf_nlists, args.ivf_nprobes)
+            if nprobe <= nlist
+        ]
+
+    if store_name == "flat_nsw":
+        return [
+            {"ef_search": ef_search, "m": m}
+            for m, ef_search in itertools.product(args.nsw_ms, args.nsw_ef_searches)
+        ]
+
+    if store_name == "flat_nsw_v2":
+        return [
+            {"m": m, "ef_construction": ef_construction, "ef_search": ef_search}
+            for m, ef_construction, ef_search in itertools.product(
+                args.nsw_ms, args.nsw_ef_constructions, args.nsw_ef_searches
+            )
+        ]
+
+    if store_name == "hnsw":
+        return [
+            {"ef_construction": ef_construction, "ef_search": ef_search,
+             "level_multiplier": args.hnsw_level_multiplier, "m": m}
+            for m, ef_construction, ef_search in itertools.product(
+                args.hnsw_ms, args.hnsw_ef_constructions, args.hnsw_ef_searches
+            )
+        ]
+
+    raise ValueError(f"Unknown store: {store_name}")
+
+
+def create_store(store_name: str, params: dict):
+    if store_name == "buffered":
+        return BufferedMatrixInMemVectorStore(buffer_size=params["buffer_size"])
 
     if store_name == "ivf":
         return IVFVectorStore(
-            nlist=args.ivf_nlist,
-            nprobe=args.ivf_nprobe,
-            buffer_size=args.buffer_size,
+            nlist=params["nlist"],
+            nprobe=params["nprobe"],
+            buffer_size=params["buffer_size"],
         )
 
     if store_name == "flat_nsw":
         return FlatNSWVectorStore(
-            m=args.nsw_m,
-            ef_search=args.nsw_ef_search,
+            m=params["m"],
+            ef_search=params["ef_search"],
+        )
+
+    if store_name == "flat_nsw_v2":
+        return FlatNSWV2VectorStore(
+            m=params["m"],
+            ef_construction=params["ef_construction"],
+            ef_search=params["ef_search"],
         )
 
     if store_name == "hnsw":
         return HNSWVectorStore(
-            m=args.hnsw_m,
-            ef_construction=args.hnsw_ef_construction,
-            ef_search=args.hnsw_ef_search,
-            level_multiplier=args.hnsw_level_multiplier,
+            m=params["m"],
+            ef_construction=params["ef_construction"],
+            ef_search=params["ef_search"],
+            level_multiplier=params["level_multiplier"],
         )
 
     raise ValueError(f"Unknown store: {store_name}")
+
+
+def _build_key(store_name: str, params: dict) -> str:
+    """Cache key covering only construction-time parameters.
+
+    flat_nsw / flat_nsw_v2 / hnsw: ef_search is search-time only, so exclude it.
+    The same built store can be reused across ef_search sweep values by patching
+    the attribute directly — no rebuild needed.
+    """
+    if store_name in ("flat_nsw", "flat_nsw_v2", "hnsw"):
+        build_p = {k: v for k, v in params.items() if k != "ef_search"}
+    else:
+        build_p = params
+    return store_name + "::" + json.dumps(build_p, sort_keys=True)
+
+
+def _apply_search_params(store, store_name: str, params: dict) -> None:
+    """Patch search-time parameters onto an already-built store (no rebuild)."""
+    if store_name in ("flat_nsw", "flat_nsw_v2", "hnsw"):
+        store.ef_search = params["ef_search"]
 
 
 def relevant_doc_ids(qrels_for_query: dict[str, int]) -> set[str]:
@@ -236,6 +338,7 @@ def evaluate_query(
 
 def aggregate_results(
         store_name: str,
+        store_parameters: str,
         records: list[VectorRecord],
         query_evaluations: list[QueryEvaluation],
         top_k: int,
@@ -246,6 +349,7 @@ def aggregate_results(
 
     return RetrievalQualityBenchmarkRow(
         store=store_name,
+        store_parameters=store_parameters,
         records=len(records),
         queries=len(query_evaluations),
         top_k=top_k,
@@ -268,6 +372,7 @@ def print_summary(row: RetrievalQualityBenchmarkRow):
     print("\nRetrieval quality benchmark")
     print("---------------------------")
     print(f"store          : {row.store}")
+    print(f"parameters     : {row.store_parameters}")
     print(f"records        : {row.records}")
     print(f"queries        : {row.queries}")
     print(f"top_k          : {row.top_k}")
@@ -336,7 +441,7 @@ def main():
     parser.add_argument("--dataset", required=True)
     parser.add_argument(
         "--store",
-        choices=["buffered", "ivf", "flat_nsw", "hnsw", "all"],
+        choices=["buffered", "ivf", "flat_nsw", "flat_nsw_v2", "hnsw", "all"],
         default="all",
     )
     parser.add_argument("--top-k", type=int, default=5)
@@ -350,26 +455,54 @@ def main():
 
     parser.add_argument("--output-csv", default=None)
     parser.add_argument("--per-query-output-csv", default=None)
+    parser.add_argument("--embedding-cache-dir", default=None,
+                        help="Directory for caching corpus and query embeddings as .npy files")
+    parser.add_argument("--max-eval-queries", type=int, default=None,
+                        help="Evaluate only the first N queries (applied after dataset validation)")
 
-    parser.add_argument("--ivf-nlist", type=int, default=10)
-    parser.add_argument("--ivf-nprobe", type=int, default=3)
+    parser.add_argument("--ivf-nlist", default="10",
+                        help="IVF nlist value(s), comma-separated for sweep (e.g. '10,50,100')")
+    parser.add_argument("--ivf-nprobe", default="3",
+                        help="IVF nprobe value(s), comma-separated for sweep (e.g. '1,3,5')")
 
-    parser.add_argument("--nsw-m", type=int, default=8)
-    parser.add_argument("--nsw-ef-search", type=int, default=32)
+    parser.add_argument("--nsw-m", default="8",
+                        help="FlatNSW M value(s), comma-separated for sweep (e.g. '8,16')")
+    parser.add_argument("--nsw-ef-search", default="32",
+                        help="FlatNSW ef_search value(s), comma-separated for sweep")
+    parser.add_argument("--nsw-ef-construction", default="64",
+                        help="FlatNSW v2 ef_construction value(s), comma-separated for sweep (e.g. '32,64,128')")
 
-    parser.add_argument("--hnsw-m", type=int, default=8)
-    parser.add_argument("--hnsw-ef-construction", type=int, default=64)
-    parser.add_argument("--hnsw-ef-search", type=int, default=32)
+    parser.add_argument("--hnsw-m", default="8",
+                        help="HNSW M value(s), comma-separated for sweep (e.g. '8,16')")
+    parser.add_argument("--hnsw-ef-construction", default="64",
+                        help="HNSW ef_construction value(s), comma-separated for sweep")
+    parser.add_argument("--hnsw-ef-search", default="32",
+                        help="HNSW ef_search value(s), comma-separated for sweep")
     parser.add_argument("--hnsw-level-multiplier", type=float, default=1.0)
 
     args = parser.parse_args()
 
+    if args.top_k <= 0:
+        raise ValueError(f"--top-k must be > 0, got {args.top_k}")
+
+    args.ivf_nlists = parse_int_list(args.ivf_nlist)
+    args.ivf_nprobes = parse_int_list(args.ivf_nprobe)
+    args.nsw_ms = parse_int_list(args.nsw_m)
+    args.nsw_ef_searches = parse_int_list(args.nsw_ef_search)
+    args.nsw_ef_constructions = parse_int_list(args.nsw_ef_construction)
+    args.hnsw_ms = parse_int_list(args.hnsw_m)
+    args.hnsw_ef_constructions = parse_int_list(args.hnsw_ef_construction)
+    args.hnsw_ef_searches = parse_int_list(args.hnsw_ef_search)
+
     stores_to_run = ALL_STORES if args.store == "all" else [args.store]
-    multi_store = len(stores_to_run) > 1
+    total_configs = sum(len(param_grid(s, args)) for s in stores_to_run)
+    is_single_config = total_configs == 1
 
-    if multi_store and args.per_query_output_csv:
-        print("Warning: --per-query-output-csv is ignored when --store is 'all'")
+    if not is_single_config and args.per_query_output_csv:
+        print("Warning: --per-query-output-csv is ignored when running multiple configurations "
+              "(use a single store with single-value parameters to enable it)")
 
+    cache_dir = Path(args.embedding_cache_dir) if args.embedding_cache_dir else None
     dataset_dir = Path(args.dataset)
 
     corpus, queries, qrels = load_dataset(dataset_dir)
@@ -381,11 +514,12 @@ def main():
     print(f"queries       : {len(queries)}")
     print(f"qrels queries : {len(qrels)}")
 
-    missing_qrels = sorted(set(queries.keys()) - set(qrels.keys()))
-    if missing_qrels:
-        raise ValueError(
-            f"Missing qrels for {len(missing_qrels)} queries: {missing_qrels[:10]}"
-        )
+    validate_dataset(corpus, queries, qrels)
+
+    query_ids = list(queries.keys())
+    if args.max_eval_queries is not None and args.max_eval_queries < len(query_ids):
+        query_ids = query_ids[:args.max_eval_queries]
+        print(f"eval queries  : {len(query_ids)} (capped by --max-eval-queries)")
 
     embedding_model = create_embedding_model(args.embedding_model)
 
@@ -394,10 +528,14 @@ def main():
 
     print("\nEmbedding corpus")
     print("----------------")
-    corpus_vectors = embed_texts(
+    corpus_vectors = embed_texts_with_cache(
         embedding_model=embedding_model,
+        model_type=args.embedding_model,
+        ids=corpus_ids,
         texts=corpus_texts,
         desc="Embedding corpus",
+        cache_dir=cache_dir,
+        cache_prefix="corpus",
     )
 
     records = build_records(
@@ -406,65 +544,80 @@ def main():
         corpus_vectors=corpus_vectors,
     )
 
-    query_ids = list(queries.keys())
-    query_texts = [queries[query_id] for query_id in query_ids]
+    query_texts = [queries[qid] for qid in query_ids]
 
     print("\nEmbedding queries")
     print("-----------------")
-    query_vectors = embed_texts(
+    query_vectors = embed_texts_with_cache(
         embedding_model=embedding_model,
+        model_type=args.embedding_model,
+        ids=query_ids,
         texts=query_texts,
         desc="Embedding queries",
+        cache_dir=cache_dir,
+        cache_prefix="query",
     )
 
     summary_rows: list[RetrievalQualityBenchmarkRow] = []
     last_query_evaluations: list[QueryEvaluation] = []
+    built_store_cache: dict[str, tuple] = {}
 
     for store_name in stores_to_run:
-        print(f"\nPreparing store: {store_name}")
-        print("---------------")
-        store = create_store(store_name, args)
-        insert_time_sec = insert_records(store, records)
-        build_time_sec = maybe_build_store(store)
+        for params in param_grid(store_name, args):
+            cache_key = _build_key(store_name, params)
 
-        print(f"\nEvaluating queries: {store_name}")
-        print("------------------")
+            if cache_key not in built_store_cache:
+                print(f"\nPreparing store: {store_name}")
+                print("---------------")
+                store = create_store(store_name, params)
+                insert_time_sec = insert_records(store, records)
+                build_time_sec = maybe_build_store(store)
+                built_store_cache[cache_key] = (store, insert_time_sec, build_time_sec)
+            else:
+                store, insert_time_sec, build_time_sec = built_store_cache[cache_key]
+                _apply_search_params(store, store_name, params)
+                print(f"\nReusing store: {store_name} (ef_search → {params['ef_search']})")
+                print("-------------")
 
-        query_evaluations: list[QueryEvaluation] = []
+            print(f"\nEvaluating queries: {store_name}")
+            print("------------------")
 
-        for query_id, query_vector in tqdm(
-                list(zip(query_ids, query_vectors)),
-                desc="Retrieval quality",
-        ):
-            query_evaluations.append(
-                evaluate_query(
-                    store=store,
-                    query_id=query_id,
-                    query_vector=query_vector,
-                    qrels_for_query=qrels[query_id],
-                    top_k=args.top_k,
+            query_evaluations: list[QueryEvaluation] = []
+
+            for query_id, query_vector in tqdm(
+                    list(zip(query_ids, query_vectors)),
+                    desc="Retrieval quality",
+            ):
+                query_evaluations.append(
+                    evaluate_query(
+                        store=store,
+                        query_id=query_id,
+                        query_vector=query_vector,
+                        qrels_for_query=qrels[query_id],
+                        top_k=args.top_k,
+                    )
                 )
+
+            row = aggregate_results(
+                store_name=store_name,
+                store_parameters=json.dumps(params, sort_keys=True),
+                records=records,
+                query_evaluations=query_evaluations,
+                top_k=args.top_k,
+                insert_time_sec=insert_time_sec,
+                build_time_sec=build_time_sec,
             )
 
-        row = aggregate_results(
-            store_name=store_name,
-            records=records,
-            query_evaluations=query_evaluations,
-            top_k=args.top_k,
-            insert_time_sec=insert_time_sec,
-            build_time_sec=build_time_sec,
-        )
+            summary_rows.append(row)
+            print_summary(row)
 
-        summary_rows.append(row)
-        print_summary(row)
-
-        if not multi_store:
-            last_query_evaluations = query_evaluations
+            if is_single_config:
+                last_query_evaluations = query_evaluations
 
     if args.output_csv:
         write_summary_csv(args.output_csv, summary_rows)
 
-    if not multi_store and args.per_query_output_csv:
+    if is_single_config and args.per_query_output_csv:
         write_per_query_csv(args.per_query_output_csv, last_query_evaluations)
 
 
