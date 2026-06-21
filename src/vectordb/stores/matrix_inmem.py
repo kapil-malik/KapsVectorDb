@@ -116,15 +116,12 @@ class MatrixBackedInMemVectorStore:
 
         scores = self._vectors @ normalized_query
 
-        # If records were deleted, some matrix rows may no longer be active.
-        # For now, filter those out after scoring.
-        active_results: list[SearchResult] = []
+        candidate_multiplier = 10 if filters else 4
+        candidate_count = min(len(scores), top_k * candidate_multiplier)
+        top_indices = np.argpartition(-scores, candidate_count - 1)[:candidate_count]
 
-        # np.argsort returns indices in ascending order.
-        # We use negative scores to get descending order.
-        sorted_indices = np.argsort(-scores)
-
-        for index in sorted_indices:
+        candidates: list[tuple[float, str]] = []
+        for index in top_indices:
             record_id = self._ids[index]
             record = self._records.get(record_id)
 
@@ -134,14 +131,11 @@ class MatrixBackedInMemVectorStore:
             if not metadata_matches(record, filters):
                 continue
 
-            active_results.append(
-                SearchResult(
-                    record=record,
-                    score=float(scores[index]),
-                )
-            )
+            candidates.append((float(scores[index]), record_id))
 
-            if len(active_results) == top_k:
-                break
+        top_candidates = sorted(candidates, key=lambda x: x[0], reverse=True)[:top_k]
 
-        return active_results
+        return [
+            SearchResult(record=self._records[record_id], score=score)
+            for score, record_id in top_candidates
+        ]

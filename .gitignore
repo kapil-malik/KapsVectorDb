@@ -226,6 +226,7 @@ __marimo__/
 records.jsonl
 tombstones.txt
 vectors.npy
+benchmark_store_data/
 
 # BEIR datasets (large, re-downloadable via benchmarks/download_beir_dataset.py)
 data/retrieval_quality/beir/fiqa/
