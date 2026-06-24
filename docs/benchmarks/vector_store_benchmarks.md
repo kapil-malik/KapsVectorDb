@@ -42,10 +42,34 @@ poetry run python -m benchmarks.benchmark_store \
 | `--dim` | Vector dimensions |
 | `--queries` | Number of search queries to run |
 | `--top-k` | Number of top results to retrieve |
+| `--checkpoints` | Comma-separated record counts at which to pause and measure search latency (e.g. `1000,5000,10000,50000,100000`). See below. |
 | `--clean-file-store` | Wipe and recreate data directories for `file` and `mmap` stores |
 | `--output-csv` | Override summary CSV path (default: `benchmarks/results/store_comparison.csv`) |
 
 Soft-delete and compaction benchmarking is handled separately by `benchmark_tombstones.py`.
+
+## Latency Scaling Across Record Counts (`--checkpoints`)
+
+Passing `--checkpoints` switches the script into a different mode: records are inserted
+incrementally and search is benchmarked at each stop. This produces one row per
+`(store, checkpoint)` pair in a single pass — avoiding the cost of re-running inserts
+from scratch at each scale.
+
+```bash
+poetry run python -m benchmarks.benchmark_store \
+  --store all \
+  --records 100000 \
+  --checkpoints 1000,5000,10000,50000,100000 \
+  --dim 384 \
+  --queries 1000 \
+  --top-k 5 \
+  --clean-file-store
+```
+
+Output is written to `benchmarks/results/store_latency_scaling.csv` (one row per store
+per checkpoint). Visualizations of how search latency scales with record count across
+all stores are covered in
+[../visualizations/store_latency_scaling.md](../visualizations/store_latency_scaling.md).
 
 When `--store all` is used, all stores are benchmarked on the **same pre-generated
 record and query vectors**, ensuring a fair comparison.

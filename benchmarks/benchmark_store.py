@@ -43,6 +43,20 @@ class StoreBenchmarkResult:
     queries_per_sec: float
 
 
+@dataclass(frozen=True)
+class StoreScalingResult:
+    store: str
+    checkpoint: int
+    dim: int
+    queries: int
+    top_k: int
+    avg_latency_ms: float
+    p50_latency_ms: float
+    p95_latency_ms: float
+    p99_latency_ms: float
+    queries_per_sec: float
+
+
 def store_data_dir(store_type: str) -> Path:
     return STORE_DATA_ROOT / store_type
 
@@ -231,6 +245,110 @@ def write_summary_csv(output_csv: str, rows: list[StoreBenchmarkResult]) -> None
     print(f"\nWrote store comparison summary to: {output_path}")
 
 
+def run_store_checkpoint_benchmark(
+        store_type: str,
+        args,
+        records: list[VectorRecord],
+        query_vectors: list[np.ndarray],
+) -> list[StoreScalingResult]:
+    checkpoints: list[int] = args.checkpoints
+
+    print(f"\n{'=' * 50}")
+    print(f"Store: {store_type}  (checkpoints: {checkpoints})")
+    print(f"{'=' * 50}")
+
+    if store_type in ("file", "mmap") and args.clean_file_store:
+        clean_store_data(store_type)
+    elif store_type in ("file", "mmap"):
+        store_data_dir(store_type).mkdir(parents=True, exist_ok=True)
+
+    if store_type == "mmap":
+        insert_store = FileBackedVectorStore(**_file_store_kwargs("mmap"))
+    else:
+        insert_store = create_store(store_type)
+
+    results: list[StoreScalingResult] = []
+    inserted = 0
+    cumulative_insert_sec = 0.0
+
+    for checkpoint in checkpoints:
+        segment = records[inserted:checkpoint]
+
+        print(f"\n--- Inserting records {inserted + 1:,}–{checkpoint:,} ({len(segment):,} new records) ---")
+        t_start = time.perf_counter()
+        for record in tqdm(segment, desc=f"Inserting to {checkpoint:,}"):
+            insert_store.insert(record)
+        cumulative_insert_sec += time.perf_counter() - t_start
+        inserted = checkpoint
+        print(f"  cumulative insert time : {cumulative_insert_sec:.2f}s")
+
+        if hasattr(insert_store, "save"):
+            insert_store.save()
+
+        if store_type == "mmap":
+            search_store = MMapVectorStore(**_file_store_kwargs("mmap"))
+        else:
+            search_store = insert_store
+
+        print(f"\nSearch at checkpoint {checkpoint:,} records")
+        avg_ms, p50_ms, p95_ms, p99_ms, qps = benchmark_search(
+            search_store, query_vectors, args.top_k,
+        )
+
+        results.append(StoreScalingResult(
+            store=store_type,
+            checkpoint=checkpoint,
+            dim=args.dim,
+            queries=args.queries,
+            top_k=args.top_k,
+            avg_latency_ms=avg_ms,
+            p50_latency_ms=p50_ms,
+            p95_latency_ms=p95_ms,
+            p99_latency_ms=p99_ms,
+            queries_per_sec=qps,
+        ))
+
+    return results
+
+
+def write_scaling_csv(output_csv: str, rows: list[StoreScalingResult]) -> None:
+    output_path = Path(output_csv)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    row_dicts = [dataclasses.asdict(r) for r in rows]
+
+    with output_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(row_dicts[0].keys()))
+        writer.writeheader()
+        writer.writerows(row_dicts)
+
+    print(f"\nWrote store latency scaling summary to: {output_path}")
+
+
+def print_scaling_table(rows: list[StoreScalingResult]) -> None:
+    print("\n\nStore Latency Scaling Summary")
+    print("=============================")
+    header = (
+        f"{'Store':<18} {'Checkpoint':>11} {'Avg(ms)':>9} "
+        f"{'p50(ms)':>9} {'p95(ms)':>9} {'p99(ms)':>9} {'QPS':>7}"
+    )
+    print(header)
+    print("-" * len(header))
+    current_store = None
+    for r in rows:
+        if current_store is not None and r.store != current_store:
+            print()
+        current_store = r.store
+        print(
+            f"{r.store:<18} "
+            f"{r.checkpoint:>11,} "
+            f"{r.avg_latency_ms:>9.4f} "
+            f"{r.p50_latency_ms:>9.4f} "
+            f"{r.p95_latency_ms:>9.4f} "
+            f"{r.p99_latency_ms:>9.4f} "
+            f"{r.queries_per_sec:>7.0f}"
+        )
+
+
 def print_comparison_table(rows: list[StoreBenchmarkResult]) -> None:
     print("\n\nStore Comparison Summary")
     print("========================")
@@ -267,6 +385,16 @@ def main():
     parser.add_argument("--queries", type=int, default=100)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument(
+        "--checkpoints",
+        default=None,
+        help=(
+            "Comma-separated record counts at which to pause and measure search latency "
+            "(e.g. '1000,5000,10000,50000,100000'). Enables checkpoint mode: records are "
+            "inserted incrementally and search is benchmarked at each stop. Writes to "
+            "store_latency_scaling.csv instead of store_comparison.csv."
+        ),
+    )
+    parser.add_argument(
         "--clean-file-store",
         action="store_true",
         help="Wipe and recreate data directories for file and mmap stores before running.",
@@ -282,19 +410,39 @@ def main():
 
     args = parser.parse_args()
 
+    if args.checkpoints is not None:
+        checkpoints = sorted(int(x.strip()) for x in args.checkpoints.split(","))
+        if any(c <= 0 for c in checkpoints):
+            parser.error("All --checkpoints values must be positive integers")
+        if max(checkpoints) > args.records:
+            parser.error(
+                f"Max checkpoint ({max(checkpoints):,}) exceeds --records ({args.records:,})"
+            )
+        args.checkpoints = checkpoints
+
     records = generate_records(args.records, args.dim, desc="Generating vectors")
     query_vectors = [generate_random_vector(args.dim) for _ in range(args.queries)]
 
     stores_to_run = EXACT_STORES if args.store == "all" else [args.store]
 
-    results: list[StoreBenchmarkResult] = []
-    for store_type in stores_to_run:
-        results.append(run_store_benchmark(store_type, args, records, query_vectors))
+    if args.checkpoints is not None:
+        scaling_results: list[StoreScalingResult] = []
+        for store_type in stores_to_run:
+            scaling_results.extend(
+                run_store_checkpoint_benchmark(store_type, args, records, query_vectors)
+            )
+        print_scaling_table(scaling_results)
+        output_csv = args.output_csv or "benchmarks/results/store_latency_scaling.csv"
+        write_scaling_csv(output_csv, scaling_results)
+    else:
+        results: list[StoreBenchmarkResult] = []
+        for store_type in stores_to_run:
+            results.append(run_store_benchmark(store_type, args, records, query_vectors))
 
-    if args.store == "all":
-        print_comparison_table(results)
-        output_csv = args.output_csv or "benchmarks/results/store_comparison.csv"
-        write_summary_csv(output_csv, results)
+        if args.store == "all":
+            print_comparison_table(results)
+            output_csv = args.output_csv or "benchmarks/results/store_comparison.csv"
+            write_summary_csv(output_csv, results)
 
 
 if __name__ == "__main__":

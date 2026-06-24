@@ -238,5 +238,5 @@ HNSW      →  hierarchical navigation then refine (cost = nav_overhead + layer_
 
 ## Related Visualizations
 
-See [../visualizations/benchmark_results.md](../visualizations/benchmark_results.md)
+See [../visualizations/ann_benchmark_results.md](../visualizations/ann_benchmark_results.md)
 for recall–latency and efficiency plots generated from the benchmark CSV.
