@@ -143,47 +143,6 @@ def benchmark_search(
     return avg_ms, p50_ms, p95_ms, p99_ms, queries_per_sec
 
 
-def benchmark_delete(store: VectorStore, delete_count: int) -> None:
-    start = time.perf_counter()
-
-    deleted = 0
-    for i in tqdm(range(delete_count), desc="Deleting vectors"):
-        if store.delete(f"record-{i}"):
-            deleted += 1
-
-    end = time.perf_counter()
-    total_time_sec = end - start
-
-    print("\nDelete benchmark")
-    print("----------------")
-    print(f"requested deletes : {delete_count}")
-    print(f"actual deletes    : {deleted}")
-    print(f"total time        : {total_time_sec:.4f} sec")
-    rate = f"{deleted / total_time_sec:.2f}" if total_time_sec > 0 else "inf"
-    print(f"deletes/sec       : {rate}")
-    print(f"remaining count   : {store.count()}")
-
-
-def benchmark_compact(store: VectorStore) -> None:
-    if not hasattr(store, "compact"):
-        print("\nCompact benchmark")
-        print("-----------------")
-        print("Store does not support compact(); skipping.")
-        return
-
-    if hasattr(store, "save"):
-        store.save()
-
-    start = time.perf_counter()
-    store.compact()
-    end = time.perf_counter()
-
-    print("\nCompact benchmark")
-    print("-----------------")
-    print(f"total time      : {end - start:.4f} sec")
-    print(f"remaining count : {store.count()}")
-
-
 def benchmark_build(store: VectorStore) -> None:
     if not hasattr(store, "build"):
         print("\nBuild benchmark")
@@ -226,32 +185,10 @@ def run_store_benchmark(
     else:
         insert_store = create_store(store_type)
 
-    insert_time_sec = 0.0
-    insert_throughput = 0.0
-
-    if not args.skip_insert:
-        if args.delete_count > 0:
-            undeleted_records = records[args.delete_count:]
-            deleted_records = records[:args.delete_count]
-        else:
-            undeleted_records = records
-            deleted_records = []
-
-        insert_time_sec, insert_throughput = benchmark_insert(insert_store, undeleted_records)
-        if hasattr(insert_store, "save"):
-            insert_store.save()
-        benchmark_build(insert_store)
-
-        if args.delete_count > 0:
-            print(f"\nSearch on {insert_store.count()} records. INSERT ONLY (no deletes yet)")
-            benchmark_search(store=insert_store, query_vectors=query_vectors, top_k=args.top_k)
-
-            t, tp = benchmark_insert(insert_store, deleted_records)
-            insert_time_sec += t
-            insert_throughput = (args.records / insert_time_sec) if insert_time_sec > 0 else 0.0
-            if hasattr(insert_store, "save"):
-                insert_store.save()
-            benchmark_build(insert_store)
+    insert_time_sec, insert_throughput = benchmark_insert(insert_store, records)
+    if hasattr(insert_store, "save"):
+        insert_store.save()
+    benchmark_build(insert_store)
 
     # For mmap: reload the saved files via MMapVectorStore for the search phase.
     if store_type == "mmap":
@@ -264,18 +201,6 @@ def run_store_benchmark(
     avg_ms, p50_ms, p95_ms, p99_ms, qps = benchmark_search(
         store=store, query_vectors=query_vectors, top_k=args.top_k,
     )
-
-    if args.delete_count > 0:
-        benchmark_delete(store, args.delete_count)
-
-        print(f"\nSearch on {store.count()} records. AFTER DELETES")
-        benchmark_search(store=store, query_vectors=query_vectors, top_k=args.top_k)
-
-    if args.compact:
-        benchmark_compact(store)
-
-        print(f"\nSearch on {store.count()} records. AFTER COMPACT")
-        benchmark_search(store=store, query_vectors=query_vectors, top_k=args.top_k)
 
     return StoreBenchmarkResult(
         store=store_type,
@@ -341,9 +266,6 @@ def main():
     parser.add_argument("--dim", type=int, default=384)
     parser.add_argument("--queries", type=int, default=100)
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--delete-count", type=int, default=0)
-    parser.add_argument("--compact", action="store_true")
-    parser.add_argument("--skip-insert", action="store_true")
     parser.add_argument(
         "--clean-file-store",
         action="store_true",

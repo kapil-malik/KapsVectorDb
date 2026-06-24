@@ -7,7 +7,6 @@ implementations using `benchmark_store.py`.
 
 - Vector insertion throughput (records/sec) and total insert time
 - Vector similarity search latency (avg, p50, p95, p99) and queries/sec
-- Optionally: soft-delete throughput, compaction time, and post-compaction search latency
 
 ## Run
 
@@ -43,10 +42,10 @@ poetry run python -m benchmarks.benchmark_store \
 | `--dim` | Vector dimensions |
 | `--queries` | Number of search queries to run |
 | `--top-k` | Number of top results to retrieve |
-| `--delete-count` | Number of soft-deletes to benchmark after insert |
-| `--compact` | Run compaction benchmark after deletes |
 | `--clean-file-store` | Wipe and recreate data directories for `file` and `mmap` stores |
 | `--output-csv` | Override summary CSV path (default: `benchmarks/results/store_comparison.csv`) |
+
+Soft-delete and compaction benchmarking is handled separately by `benchmark_tombstones.py`.
 
 When `--store all` is used, all stores are benchmarked on the **same pre-generated
 record and query vectors**, ensuring a fair comparison.

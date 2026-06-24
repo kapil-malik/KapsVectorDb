@@ -22,7 +22,7 @@ Measures:
 ## Run
 
 ```bash
-poetry run python benchmarks/benchmark_retriever.py \
+poetry run python -m benchmarks.benchmark_retriever \
   --chunks 1024 \
   --queries 100 \
   --embedding-model sentence-transformer

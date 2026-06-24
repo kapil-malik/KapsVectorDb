@@ -68,7 +68,7 @@ than the same result at rank 10.
 ### Download and convert a dataset
 
 ```bash
-python -m benchmarks.download_beir_dataset \
+poetry run python -m benchmarks.download_beir_dataset \
   --dataset hotpotqa \
   --output-dir data/retrieval_quality/beir/hotpotqa_100k \
   --max-corpus-docs 100000 \
@@ -91,7 +91,7 @@ Key arguments for `download_beir_dataset.py`:
 Single-store sanity check:
 
 ```bash
-python -m benchmarks.benchmark_retrieval_quality \
+poetry run python -m benchmarks.benchmark_retrieval_quality \
   --dataset data/retrieval_quality/beir/hotpotqa_100k \
   --store buffered \
   --embedding-model sentence-transformer \
@@ -102,7 +102,7 @@ python -m benchmarks.benchmark_retrieval_quality \
 Full sweep across all stores:
 
 ```bash
-python -m benchmarks.benchmark_retrieval_quality \
+poetry run python -m benchmarks.benchmark_retrieval_quality \
   --dataset data/retrieval_quality/beir/hotpotqa_100k \
   --store all \
   --embedding-model sentence-transformer \

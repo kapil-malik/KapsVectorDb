@@ -17,7 +17,7 @@ workload. Recall is measured against exact vector search as the baseline.
 ## Benchmark Setup
 
 ```bash
-poetry run python benchmarks/benchmark_pdf_ann_stores.py \
+poetry run python -m benchmarks.benchmark_pdf_ann_stores \
   --pdf The_DynamoDb_Book.pdf \
   --queries-file ./benchmarks/data/pdf_queries.txt \
   --output-csv ./benchmarks/results/pdf_ann_results_3.csv \

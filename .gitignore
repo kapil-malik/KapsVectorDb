@@ -228,9 +228,8 @@ tombstones.txt
 vectors.npy
 benchmark_store_data/
 
-# BEIR datasets (large, re-downloadable via benchmarks/download_beir_dataset.py)
-data/retrieval_quality/beir/fiqa/
-data/retrieval_quality/beir/hotpotqa_100k/
+# Downloaded datasets and embedding caches (re-downloadable, not for VCS)
+data/
 
-# Embedding caches
-data/retrieval_quality/cache/
+# Scout search config (tool-specific, not project source)
+.scout/

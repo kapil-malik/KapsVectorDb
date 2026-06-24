@@ -6,15 +6,13 @@ file-backed store.
 ## Benchmark Setup
 
 ```bash
-poetry run python benchmarks/benchmark_store.py \
-  --store file \
+poetry run python -m benchmarks.benchmark_tombstones \
   --records 100000 \
+  --delete-count 60000 \
   --dim 384 \
   --queries 1000 \
   --top-k 5 \
-  --delete-count 60000 \
-  --compact \
-  --clean-file-store
+  --clean
 ```
 
 ## Workflow
